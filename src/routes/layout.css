@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@import "tw-animate-css";
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -109,6 +107,25 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --animate-echo-inner: echo-inner-op 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animate-echo-middle: echo-middle-rot 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animate-echo-outer: echo-outer-rot 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+
+  @keyframes echo-inner-op {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+  }
+  @keyframes echo-middle-rot {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.04); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  @keyframes echo-outer-rot {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(-180deg) scale(1.12); }
+    100% { transform: rotate(-360deg) scale(1); }
+  }
 }
 
 @layer base {
