@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
 	import { cn } from '$lib/utils.js';
-	import PageTitle from '$lib/components/page-title.svelte';
+	import PageTitle from '$lib/components/page-title-1.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 
 	let {

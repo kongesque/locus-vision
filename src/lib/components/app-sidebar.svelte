@@ -2,7 +2,6 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Home, Radio, ScanSearch, Settings } from '@lucide/svelte';
 	import Echo from '$lib/components/svg/echo.svelte';
-	import { Badge } from '$lib/components/ui/badge/index.js';
 </script>
 
 <Sidebar.Root collapsible="icon">
@@ -12,7 +11,6 @@
 				<Sidebar.MenuButton class="pointer-events-none data-[slot=sidebar-menu-button]:!p-1">
 					<Echo class="!size-6" />
 					<span class="text-base font-semibold group-data-[collapsible=icon]:hidden">Locus</span>
-					<Badge variant="secondary" class="group-data-[collapsible=icon]:hidden">Beta</Badge>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
