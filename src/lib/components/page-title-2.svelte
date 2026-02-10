@@ -1,16 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { getPageTitle } from '$lib/utils/page-title.js';
 
-	const titleMap: Record<string, string> = {
-		'/': 'Home',
-		'/livestream': 'Live Stream',
-		'/video-analytics': 'Video Analytics',
-		'/settings': 'Settings'
-	};
-
-	let title = $derived(titleMap[page.url.pathname] || 'Locus');
+	let { title = undefined } = $props();
+	let resolvedTitle = $derived(title ?? getPageTitle(page.url.pathname));
 </script>
 
-<div class="flex items-center gap-2 px-4">
-	<h1 class="text-xl font-bold tracking-tight">{title}</h1>
-</div>
+<span class="text-2xl font-semibold tracking-tight">{resolvedTitle}</span>
