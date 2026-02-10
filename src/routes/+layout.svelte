@@ -4,10 +4,10 @@
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import Header from '$lib/components/header.svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
 </script>
 
-<Sidebar.Provider>
+<Sidebar.Provider open={data.sidebarOpen}>
 	<AppSidebar />
 	<main class="flex h-svh w-full flex-1 flex-col overflow-y-auto">
 		<Header />
