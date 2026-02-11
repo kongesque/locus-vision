@@ -54,7 +54,7 @@
 	<PageTitle2 />
 	<UploadArea />
 
-	<div class="mt-8 flex flex-col gap-4">
+	<div class="mt-4 flex flex-col gap-4">
 		<SearchInput bind:value={searchQuery} />
 
 		{#if loading}

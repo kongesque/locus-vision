@@ -18,7 +18,7 @@
 	let {
 		taskId,
 		name,
-		thumbnail = '/zonenet.png',
+		thumbnail = '/locus.png',
 		duration,
 		createdAt,
 		format,
@@ -61,7 +61,7 @@
 							{...props}
 							variant="ghost"
 							size="icon"
-							class="h-8 w-8 focus:outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+							class="h-8 w-8 cursor-pointer focus:outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-accent"
 						>
 							<MoreVertical class="h-4 w-4" />
 							<span class="sr-only">Open menu</span>

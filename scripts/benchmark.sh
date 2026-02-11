@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pi 5 App Benchmark - Evaluates app weight for Raspberry Pi 5 (8GB)
+# Pi 5 App Benchmark - Granular Analysis
 # Usage: ./scripts/benchmark.sh
 
 set -e
@@ -9,10 +9,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}   🔬 Edge Device Analysis${NC}"
+echo -e "${BLUE}   🔬 Edge Device Analysis (Pi 5 Target)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -20,97 +21,141 @@ echo ""
 echo -e "${YELLOW}Building production bundle...${NC}"
 pnpm build > /dev/null 2>&1
 
-# Metrics with Pi 5 thresholds
-# Thresholds based on Pi 5 8GB specs: 2.4GHz Cortex-A76, 8GB RAM
-
 echo -e "${BLUE}Analyzing metrics...${NC}"
 echo ""
 
 TOTAL_SCORE=0
-METRICS_COUNT=5
+METRICS_COUNT=4 # JS, CSS, Assets, Dependencies
 
-# 1. Client bundle size (target: <500KB, excellent: <100KB)
-CLIENT_SIZE=$(du -sk .svelte-kit/output/client 2>/dev/null | cut -f1)
-if [ "$CLIENT_SIZE" -lt 100 ]; then
-  CLIENT_SCORE=100
-elif [ "$CLIENT_SIZE" -lt 250 ]; then
-  CLIENT_SCORE=90
-elif [ "$CLIENT_SIZE" -lt 500 ]; then
-  CLIENT_SCORE=75
-elif [ "$CLIENT_SIZE" -lt 1000 ]; then
-  CLIENT_SCORE=50
-else
-  CLIENT_SCORE=25
-fi
-TOTAL_SCORE=$((TOTAL_SCORE + CLIENT_SCORE))
-echo -e "📦 Client Bundle:    ${CLIENT_SIZE}KB $([ $CLIENT_SCORE -ge 75 ] && echo -e "${GREEN}($CLIENT_SCORE/100)${NC}" || echo -e "${YELLOW}($CLIENT_SCORE/100)${NC}")"
+# Helper function for Gzip size
+get_gzip_size() {
+  find .svelte-kit/output/client -name "$1" -print0 | xargs -0 cat | gzip -c | wc -c
+}
 
-# 2. Server bundle size (target: <2MB, excellent: <500KB)
-SERVER_SIZE=$(du -sk .svelte-kit/output/server 2>/dev/null | cut -f1)
-if [ "$SERVER_SIZE" -lt 500 ]; then
-  SERVER_SCORE=100
-elif [ "$SERVER_SIZE" -lt 1000 ]; then
-  SERVER_SCORE=85
-elif [ "$SERVER_SIZE" -lt 2000 ]; then
-  SERVER_SCORE=70
-elif [ "$SERVER_SIZE" -lt 5000 ]; then
-  SERVER_SCORE=50
-else
-  SERVER_SCORE=25
-fi
-TOTAL_SCORE=$((TOTAL_SCORE + SERVER_SCORE))
-echo -e "🖥️  Server Bundle:    ${SERVER_SIZE}KB $([ $SERVER_SCORE -ge 75 ] && echo -e "${GREEN}($SERVER_SCORE/100)${NC}" || echo -e "${YELLOW}($SERVER_SCORE/100)${NC}")"
+# Helper function for Raw size
+get_raw_size() {
+  find .svelte-kit/output/client -name "$1" -print0 | xargs -0 cat | wc -c
+}
 
-# 3. Total JS files count (fewer = faster startup)
-JS_COUNT=$(find .svelte-kit/output/client -name "*.js" | wc -l | tr -d ' ')
-if [ "$JS_COUNT" -lt 15 ]; then
+# 1. JavaScript Bundle (Gzipped)
+JS_RAW_BYTES=$(get_raw_size "*.js")
+JS_GZIP_BYTES=$(get_gzip_size "*.js")
+JS_GZIP_KB=$((JS_GZIP_BYTES / 1024))
+JS_RAW_KB=$((JS_RAW_BYTES / 1024))
+
+if [ "$JS_GZIP_KB" -lt 150 ]; then
   JS_SCORE=100
-elif [ "$JS_COUNT" -lt 25 ]; then
-  JS_SCORE=85
-elif [ "$JS_COUNT" -lt 40 ]; then
+  JS_COLOR=$GREEN
+elif [ "$JS_GZIP_KB" -lt 300 ]; then
+  JS_SCORE=90
+  JS_COLOR=$GREEN
+elif [ "$JS_GZIP_KB" -lt 500 ]; then
   JS_SCORE=70
-elif [ "$JS_COUNT" -lt 60 ]; then
-  JS_SCORE=50
+  JS_COLOR=$YELLOW
 else
-  JS_SCORE=30
+  JS_SCORE=40
+  JS_COLOR=$RED
 fi
 TOTAL_SCORE=$((TOTAL_SCORE + JS_SCORE))
-echo -e "📄 JS Chunks:        ${JS_COUNT} files $([ $JS_SCORE -ge 75 ] && echo -e "${GREEN}($JS_SCORE/100)${NC}" || echo -e "${YELLOW}($JS_SCORE/100)${NC}")"
+echo -e "⚡ JavaScript:       ${JS_GZIP_KB}KB ${CYAN}(gzipped)${NC} ${JS_COLOR}($JS_SCORE/100)${NC}"
 
-# 4. Dependencies count (fewer = smaller attack surface, faster installs)
-DEP_COUNT=$(cat package.json | grep -c '"@\|"[a-z]' 2>/dev/null || echo 0)
-if [ "$DEP_COUNT" -lt 15 ]; then
-  DEP_SCORE=100
-elif [ "$DEP_COUNT" -lt 25 ]; then
-  DEP_SCORE=85
-elif [ "$DEP_COUNT" -lt 35 ]; then
-  DEP_SCORE=70
-elif [ "$DEP_COUNT" -lt 50 ]; then
-  DEP_SCORE=50
+# 2. CSS Bundle (Gzipped)
+CSS_GZIP_BYTES=$(get_gzip_size "*.css")
+CSS_GZIP_KB=$((CSS_GZIP_BYTES / 1024))
+
+if [ "$CSS_GZIP_KB" -lt 50 ]; then
+  CSS_SCORE=100
+  CSS_COLOR=$GREEN
+elif [ "$CSS_GZIP_KB" -lt 100 ]; then
+  CSS_SCORE=85
+  CSS_COLOR=$GREEN
+elif [ "$CSS_GZIP_KB" -lt 200 ]; then
+  CSS_SCORE=60
+  CSS_COLOR=$YELLOW
 else
-  DEP_SCORE=30
+  CSS_SCORE=30
+  CSS_COLOR=$RED
+fi
+TOTAL_SCORE=$((TOTAL_SCORE + CSS_SCORE))
+echo -e "🎨 CSS:              ${CSS_GZIP_KB}KB ${CYAN}(gzipped)${NC} ${CSS_COLOR}($CSS_SCORE/100)${NC}"
+
+# 3. Static Assets (Raw)
+ASSET_BYTES=$(find .svelte-kit/output/client -type f -not -name "*.js" -not -name "*.css" -not -name "*.html" -not -name "*.json" -print0 | xargs -0 cat | wc -c)
+ASSET_KB=$((ASSET_BYTES / 1024))
+
+if [ "$ASSET_KB" -lt 2000 ]; then
+  ASSET_SCORE=100
+  ASSET_COLOR=$GREEN
+elif [ "$ASSET_KB" -lt 5000 ]; then
+  ASSET_SCORE=90
+  ASSET_COLOR=$GREEN
+elif [ "$ASSET_KB" -lt 10000 ]; then
+  ASSET_SCORE=70
+  ASSET_COLOR=$YELLOW
+else
+  ASSET_SCORE=40
+  ASSET_COLOR=$RED
+fi
+TOTAL_SCORE=$((TOTAL_SCORE + ASSET_SCORE))
+echo -e "🖼️  Assets:           ${ASSET_KB}KB ${CYAN}(raw)${NC}     ${ASSET_COLOR}($ASSET_SCORE/100)${NC}"
+
+# 4. Dependencies
+DEP_COUNT=$(node -p "Object.keys(require('./package.json').dependencies || {}).length")
+if [ "$DEP_COUNT" -lt 20 ]; then
+  DEP_SCORE=100
+  DEP_COLOR=$GREEN
+elif [ "$DEP_COUNT" -lt 35 ]; then
+  DEP_SCORE=85
+  DEP_COLOR=$GREEN
+elif [ "$DEP_COUNT" -lt 50 ]; then
+  DEP_SCORE=60
+  DEP_COLOR=$YELLOW
+else
+  DEP_SCORE=40
+  DEP_COLOR=$RED
 fi
 TOTAL_SCORE=$((TOTAL_SCORE + DEP_SCORE))
-echo -e "📚 Dependencies:     ${DEP_COUNT} packages $([ $DEP_SCORE -ge 75 ] && echo -e "${GREEN}($DEP_SCORE/100)${NC}" || echo -e "${YELLOW}($DEP_SCORE/100)${NC}")"
+echo -e "📚 Dependencies:     ${DEP_COUNT} pkgs          ${DEP_COLOR}($DEP_SCORE/100)${NC}"
 
-# 5. Estimated memory (based on bundle size heuristic)
-# Rough estimate: 10x bundle size for runtime memory
-EST_MEMORY=$((($CLIENT_SIZE + $SERVER_SIZE) * 10 / 1024))
-if [ "$EST_MEMORY" -lt 50 ]; then
-  MEM_SCORE=100
-elif [ "$EST_MEMORY" -lt 100 ]; then
-  MEM_SCORE=90
-elif [ "$EST_MEMORY" -lt 200 ]; then
-  MEM_SCORE=75
-elif [ "$EST_MEMORY" -lt 500 ]; then
-  MEM_SCORE=50
+# --- Real-World Pi 5 Performance Est. ---
+# Specs:
+# - SD Card: ~80MB/s Read (UHS-I)
+# - Network: ~100MB/s (Gigabit LAN)
+# - CPU Parse: ~5MB/s (Cortex-A76 estimate for complex JS)
+
+TOTAL_BUNDLE_KB=$((JS_RAW_KB + CSS_GZIP_KB + ASSET_KB))
+
+# Calculations in milliseconds
+TIME_DISK=$((TOTAL_BUNDLE_KB * 1000 / 80000)) # 80MB/s
+TIME_NETWORK=$((TOTAL_BUNDLE_KB * 1000 / 100000)) # 100MB/s (LAN)
+TIME_PARSE=$((JS_RAW_KB * 1000 / 5000)) # 5MB/s Parse Speed
+TOTAL_TIME=$((TIME_DISK + TIME_NETWORK + TIME_PARSE))
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}   ⏱️  Real-World Pi 5 Load Time (Estimated)${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+if [ "$TOTAL_TIME" -lt 100 ]; then
+  TIME_COLOR=$GREEN
+  TIME_VERDICT="⚡ Instant"
+elif [ "$TOTAL_TIME" -lt 300 ]; then
+  TIME_COLOR=$GREEN
+  TIME_VERDICT="🚀 Very Fast"
+elif [ "$TOTAL_TIME" -lt 1000 ]; then
+  TIME_COLOR=$YELLOW
+  TIME_VERDICT="⚠️  Noticeable"
 else
-  MEM_SCORE=25
+  TIME_COLOR=$RED
+  TIME_VERDICT="❌ Slow"
 fi
-TOTAL_SCORE=$((TOTAL_SCORE + MEM_SCORE))
-echo -e "🧠 Est. Memory:      ~${EST_MEMORY}MB $([ $MEM_SCORE -ge 75 ] && echo -e "${GREEN}($MEM_SCORE/100)${NC}" || echo -e "${YELLOW}($MEM_SCORE/100)${NC}")"
 
-# Calculate final score
+echo -e "   ${TIME_COLOR}Est. Cold Start:    ~${TOTAL_TIME}ms (${TIME_VERDICT})${NC}"
+echo -e "     • Disk Read (SD):   ${TIME_DISK}ms"
+echo -e "     • Network (LAN):    ${TIME_NETWORK}ms"
+echo -e "     • CPU Parse (A76):  ${TIME_PARSE}ms"
+
+# Final Score Calculation
 FINAL_SCORE=$((TOTAL_SCORE / METRICS_COUNT))
 
 echo ""
@@ -119,35 +164,26 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 # Grade
 if [ "$FINAL_SCORE" -ge 90 ]; then
   GRADE="A+"
-  COLOR=$GREEN
-  VERDICT="Excellent for Pi 5! Ultra-lightweight."
+  FINAL_COLOR=$GREEN
+  VERDICT="🚀 Perfect for Pi 5! Highly optimized."
 elif [ "$FINAL_SCORE" -ge 80 ]; then
   GRADE="A"
-  COLOR=$GREEN
-  VERDICT="Great for Pi 5. Very responsive."
+  FINAL_COLOR=$GREEN
+  VERDICT="✅ Excellent performance on Pi 5."
 elif [ "$FINAL_SCORE" -ge 70 ]; then
   GRADE="B"
-  COLOR=$GREEN
-  VERDICT="Good for Pi 5. Should run smoothly."
+  FINAL_COLOR=$GREEN
+  VERDICT="👍 Good. Solid performance."
 elif [ "$FINAL_SCORE" -ge 60 ]; then
   GRADE="C"
-  COLOR=$YELLOW
-  VERDICT="Acceptable. May need optimization."
-elif [ "$FINAL_SCORE" -ge 50 ]; then
-  GRADE="D"
-  COLOR=$YELLOW
-  VERDICT="Heavy. Consider reducing bundle size."
+  FINAL_COLOR=$YELLOW
+  VERDICT="⚠️  Acceptable, but room for improvement."
 else
   GRADE="F"
-  COLOR=$RED
-  VERDICT="Too heavy for Pi 5. Needs major optimization."
+  FINAL_COLOR=$RED
+  VERDICT="❌ Heavy. Will feel sluggish on Pi 5."
 fi
 
-echo -e "   ${COLOR}FINAL SCORE: ${FINAL_SCORE}/100 (${GRADE})${NC}"
+echo -e "   ${FINAL_COLOR}FINAL SCORE: ${FINAL_SCORE}/100 (${GRADE})${NC}"
 echo -e "   ${VERDICT}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "Thresholds based on Raspberry Pi 5 (8GB) specs:"
-echo -e "  • 2.4GHz Cortex-A76 quad-core"
-echo -e "  • 8GB LPDDR4X RAM"
-echo -e "  • Target: <100MB runtime memory, <1MB bundle"
