@@ -23,7 +23,27 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # Backend
-backend/.venv/
+
+# Database
 backend/data/
+*.db
+*.sqlite3
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Misc
+.DS_Store
+Thumbs.db
+bundle-stats.html
+.vscode/
+.idea/
