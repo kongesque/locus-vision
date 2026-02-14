@@ -1,189 +1,236 @@
 #!/bin/bash
-# Pi 5 App Benchmark - Granular Analysis
-# Usage: ./scripts/benchmark.sh
+# Pi 5 Edge Benchmark — Frontend + Backend
+# Measures real performance metrics for Raspberry Pi 5 (8GB) deployment
+# Usage: pnpm benchmark
 
 set -e
 
 # Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+G='\033[0;32m'  Y='\033[1;33m'  R='\033[0;31m'
+B='\033[0;34m'  C='\033[0;36m'  D='\033[0;90m'  NC='\033[0m'
 
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}   🔬 Edge Device Analysis (Pi 5 Target)${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+hr() { echo -e "${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
+
+# Linear score: maps a value from [0, worst] → [100, 0], clamped
+# Usage: linear_score <value> <ideal> <worst>
+linear_score() {
+  local val=$1 ideal=$2 worst=$3
+  if [ "$val" -le "$ideal" ]; then echo 100; return; fi
+  if [ "$val" -ge "$worst" ]; then echo 0; return; fi
+  echo $(( 100 - (val - ideal) * 100 / (worst - ideal) ))
+}
+
+# Color for a score
+score_color() {
+  local s=$1
+  if [ "$s" -ge 80 ]; then echo "$G"
+  elif [ "$s" -ge 50 ]; then echo "$Y"
+  else echo "$R"; fi
+}
+
+# Accumulator
+WEIGHTED_TOTAL=0
+WEIGHT_SUM=0
+
+add_metric() {
+  local score=$1 weight=$2
+  WEIGHTED_TOTAL=$((WEIGHTED_TOTAL + score * weight))
+  WEIGHT_SUM=$((WEIGHT_SUM + weight))
+}
+
+# ═══════════════════════════════════════════════════════
+hr
+echo -e "${B}   🔬 Pi 5 Edge Benchmark${NC}"
+hr
 echo ""
 
-# Build first
-echo -e "${YELLOW}Building production bundle...${NC}"
+# ═══════════════════════════════════════════════════════
+# 1. FRONTEND BUILD
+# ═══════════════════════════════════════════════════════
+echo -e "${Y}Building production bundle...${NC}"
 pnpm build > /dev/null 2>&1
 
-echo -e "${BLUE}Analyzing metrics...${NC}"
-echo ""
+echo -e "${B}▸ Frontend${NC}"
 
-TOTAL_SCORE=0
-METRICS_COUNT=4 # JS, CSS, Assets, Dependencies
+# JS Bundle (gzipped) — weight 5 (most impactful)
+JS_GZIP=$(find .svelte-kit/output/client -name "*.js" -print0 2>/dev/null | xargs -0 cat 2>/dev/null | gzip -c | wc -c | tr -d ' ')
+JS_KB=$((JS_GZIP / 1024))
+JS_SCORE=$(linear_score "$JS_KB" 50 500)
+JS_C=$(score_color "$JS_SCORE")
+add_metric "$JS_SCORE" 5
+echo -e "  ⚡ JS Bundle:       ${JS_KB}KB ${C}(gzip)${NC}       ${JS_C}${JS_SCORE}/100${NC}"
 
-# Helper function for Gzip size
-get_gzip_size() {
-  find .svelte-kit/output/client -name "$1" -print0 | xargs -0 cat | gzip -c | wc -c
-}
+# CSS (gzipped) — weight 2
+CSS_GZIP=$(find .svelte-kit/output/client -name "*.css" -print0 2>/dev/null | xargs -0 cat 2>/dev/null | gzip -c | wc -c | tr -d ' ')
+CSS_KB=$((CSS_GZIP / 1024))
+CSS_SCORE=$(linear_score "$CSS_KB" 5 200)
+CSS_C=$(score_color "$CSS_SCORE")
+add_metric "$CSS_SCORE" 2
+echo -e "  🎨 CSS:             ${CSS_KB}KB ${C}(gzip)${NC}       ${CSS_C}${CSS_SCORE}/100${NC}"
 
-# Helper function for Raw size
-get_raw_size() {
-  find .svelte-kit/output/client -name "$1" -print0 | xargs -0 cat | wc -c
-}
-
-# 1. JavaScript Bundle (Gzipped)
-JS_RAW_BYTES=$(get_raw_size "*.js")
-JS_GZIP_BYTES=$(get_gzip_size "*.js")
-JS_GZIP_KB=$((JS_GZIP_BYTES / 1024))
-JS_RAW_KB=$((JS_RAW_BYTES / 1024))
-
-if [ "$JS_GZIP_KB" -lt 150 ]; then
-  JS_SCORE=100
-  JS_COLOR=$GREEN
-elif [ "$JS_GZIP_KB" -lt 300 ]; then
-  JS_SCORE=90
-  JS_COLOR=$GREEN
-elif [ "$JS_GZIP_KB" -lt 500 ]; then
-  JS_SCORE=70
-  JS_COLOR=$YELLOW
-else
-  JS_SCORE=40
-  JS_COLOR=$RED
-fi
-TOTAL_SCORE=$((TOTAL_SCORE + JS_SCORE))
-echo -e "⚡ JavaScript:       ${JS_GZIP_KB}KB ${CYAN}(gzipped)${NC} ${JS_COLOR}($JS_SCORE/100)${NC}"
-
-# 2. CSS Bundle (Gzipped)
-CSS_GZIP_BYTES=$(get_gzip_size "*.css")
-CSS_GZIP_KB=$((CSS_GZIP_BYTES / 1024))
-
-if [ "$CSS_GZIP_KB" -lt 50 ]; then
-  CSS_SCORE=100
-  CSS_COLOR=$GREEN
-elif [ "$CSS_GZIP_KB" -lt 100 ]; then
-  CSS_SCORE=85
-  CSS_COLOR=$GREEN
-elif [ "$CSS_GZIP_KB" -lt 200 ]; then
-  CSS_SCORE=60
-  CSS_COLOR=$YELLOW
-else
-  CSS_SCORE=30
-  CSS_COLOR=$RED
-fi
-TOTAL_SCORE=$((TOTAL_SCORE + CSS_SCORE))
-echo -e "🎨 CSS:              ${CSS_GZIP_KB}KB ${CYAN}(gzipped)${NC} ${CSS_COLOR}($CSS_SCORE/100)${NC}"
-
-# 3. Static Assets (Raw)
-ASSET_BYTES=$(find .svelte-kit/output/client -type f -not -name "*.js" -not -name "*.css" -not -name "*.html" -not -name "*.json" -print0 | xargs -0 cat | wc -c)
+# Static Assets — weight 2
+ASSET_BYTES=$(find .svelte-kit/output/client -type f \
+  -not -name "*.js" -not -name "*.css" -not -name "*.html" -not -name "*.json" \
+  -print0 2>/dev/null | xargs -0 cat 2>/dev/null | wc -c | tr -d ' ')
 ASSET_KB=$((ASSET_BYTES / 1024))
+ASSET_SCORE=$(linear_score "$ASSET_KB" 500 10000)
+ASSET_C=$(score_color "$ASSET_SCORE")
+add_metric "$ASSET_SCORE" 2
+echo -e "  🖼️  Assets:          ${ASSET_KB}KB ${C}(raw)${NC}        ${ASSET_C}${ASSET_SCORE}/100${NC}"
 
-if [ "$ASSET_KB" -lt 2000 ]; then
-  ASSET_SCORE=100
-  ASSET_COLOR=$GREEN
-elif [ "$ASSET_KB" -lt 5000 ]; then
-  ASSET_SCORE=90
-  ASSET_COLOR=$GREEN
-elif [ "$ASSET_KB" -lt 10000 ]; then
-  ASSET_SCORE=70
-  ASSET_COLOR=$YELLOW
+# SSR Pages (count route dirs as proxy for SSR complexity) — weight 1
+ROUTE_COUNT=$(find src/routes -name "+page.svelte" 2>/dev/null | wc -l | tr -d ' ')
+ROUTE_SCORE=$(linear_score "$ROUTE_COUNT" 5 50)
+ROUTE_C=$(score_color "$ROUTE_SCORE")
+add_metric "$ROUTE_SCORE" 1
+echo -e "  📄 SSR Routes:      ${ROUTE_COUNT} pages              ${ROUTE_C}${ROUTE_SCORE}/100${NC}"
+
+# ═══════════════════════════════════════════════════════
+# 2. BACKEND
+# ═══════════════════════════════════════════════════════
+echo ""
+echo -e "${B}▸ Backend${NC}"
+
+if [ -d "backend" ]; then
+  # Python source code — weight 1
+  PY_BYTES=$(find backend -type f -name "*.py" -not -path "*/.venv/*" -not -path "*/__pycache__/*" \
+    -print0 2>/dev/null | xargs -0 cat 2>/dev/null | wc -c | tr -d ' ')
+  PY_KB=$((PY_BYTES / 1024))
+  PY_SCORE=$(linear_score "$PY_KB" 10 200)
+  PY_C=$(score_color "$PY_SCORE")
+  add_metric "$PY_SCORE" 1
+  echo -e "  🐍 Python Code:     ${PY_KB}KB                  ${PY_C}${PY_SCORE}/100${NC}"
+
+  # Pip dependencies — weight 2
+  if [ -f "backend/requirements.txt" ]; then
+    PIP_COUNT=$(grep -cve '^\s*$' backend/requirements.txt 2>/dev/null || echo 0)
+  else
+    PIP_COUNT=0
+  fi
+  PIP_SCORE=$(linear_score "$PIP_COUNT" 3 30)
+  PIP_C=$(score_color "$PIP_SCORE")
+  add_metric "$PIP_SCORE" 2
+  echo -e "  📦 Pip Packages:    ${PIP_COUNT} pkgs               ${PIP_C}${PIP_SCORE}/100${NC}"
+
+  # Venv disk footprint — weight 1
+  if [ -d "backend/.venv" ]; then
+    VENV_MB=$(du -sm backend/.venv 2>/dev/null | cut -f1)
+  else
+    VENV_MB=0
+  fi
+  VENV_SCORE=$(linear_score "$VENV_MB" 30 500)
+  VENV_C=$(score_color "$VENV_SCORE")
+  add_metric "$VENV_SCORE" 1
+  echo -e "  🗂️  Venv Footprint:  ${VENV_MB}MB                  ${VENV_C}${VENV_SCORE}/100${NC}"
+
+  # DB size — weight 1
+  DB_FILE="backend/data/locusvision.db"
+  if [ -f "$DB_FILE" ]; then
+    DB_KB=$(( $(wc -c < "$DB_FILE" | tr -d ' ') / 1024 ))
+  else
+    DB_KB=0
+  fi
+  DB_SCORE=$(linear_score "$DB_KB" 100 102400)
+  DB_C=$(score_color "$DB_SCORE")
+  add_metric "$DB_SCORE" 1
+  echo -e "  💾 Database:        ${DB_KB}KB ${C}(SQLite)${NC}     ${DB_C}${DB_SCORE}/100${NC}"
 else
-  ASSET_SCORE=40
-  ASSET_COLOR=$RED
+  echo -e "  ${D}No backend directory found${NC}"
 fi
-TOTAL_SCORE=$((TOTAL_SCORE + ASSET_SCORE))
-echo -e "🖼️  Assets:           ${ASSET_KB}KB ${CYAN}(raw)${NC}     ${ASSET_COLOR}($ASSET_SCORE/100)${NC}"
 
-# 4. Dependencies
-DEP_COUNT=$(node -p "Object.keys(require('./package.json').dependencies || {}).length")
-if [ "$DEP_COUNT" -lt 20 ]; then
-  DEP_SCORE=100
-  DEP_COLOR=$GREEN
-elif [ "$DEP_COUNT" -lt 35 ]; then
-  DEP_SCORE=85
-  DEP_COLOR=$GREEN
-elif [ "$DEP_COUNT" -lt 50 ]; then
-  DEP_SCORE=60
-  DEP_COLOR=$YELLOW
+# ═══════════════════════════════════════════════════════
+# 3. RUNTIME MEASUREMENTS (if backend is running)
+# ═══════════════════════════════════════════════════════
+echo ""
+echo -e "${B}▸ Runtime${NC}"
+
+BACKEND_RUNNING=false
+if curl -sf http://127.0.0.1:8000/api/auth/setup-status > /dev/null 2>&1; then
+  BACKEND_RUNNING=true
+fi
+
+if [ "$BACKEND_RUNNING" = true ]; then
+  # API latency — average of 3 calls, weight 4 (critical metric)
+  API_TOTAL_MS=0
+  API_CALLS=3
+  for i in $(seq 1 $API_CALLS); do
+    # time_total in seconds, convert to ms
+    T=$(curl -sf -o /dev/null -w "%{time_total}" http://127.0.0.1:8000/api/auth/setup-status)
+    MS=$(echo "$T * 1000" | bc | cut -d'.' -f1)
+    API_TOTAL_MS=$((API_TOTAL_MS + MS))
+  done
+  API_AVG_MS=$((API_TOTAL_MS / API_CALLS))
+  API_SCORE=$(linear_score "$API_AVG_MS" 5 200)
+  API_C=$(score_color "$API_SCORE")
+  add_metric "$API_SCORE" 4
+  echo -e "  🌐 API Latency:     ${API_AVG_MS}ms ${C}(avg ×${API_CALLS})${NC}     ${API_C}${API_SCORE}/100${NC}"
+
+  # Backend memory (RSS) — weight 3
+  # Find the uvicorn worker process
+  UVICORN_PID=$(pgrep -f "uvicorn main:app" | head -1 2>/dev/null || true)
+  if [ -n "$UVICORN_PID" ]; then
+    RSS_KB=$(ps -o rss= -p "$UVICORN_PID" 2>/dev/null | tr -d ' ')
+    RSS_MB=$((RSS_KB / 1024))
+    MEM_SCORE=$(linear_score "$RSS_MB" 30 512)
+    MEM_C=$(score_color "$MEM_SCORE")
+    add_metric "$MEM_SCORE" 3
+    echo -e "  🧠 Backend RAM:     ${RSS_MB}MB ${C}(RSS)${NC}        ${MEM_C}${MEM_SCORE}/100${NC}"
+  else
+    echo -e "  ${D}🧠 Backend RAM:     (uvicorn PID not found)${NC}"
+  fi
 else
-  DEP_SCORE=40
-  DEP_COLOR=$RED
+  echo -e "  ${D}Backend not running — skipping runtime metrics.${NC}"
+  echo -e "  ${D}Start with: cd backend && uvicorn main:app --reload${NC}"
 fi
-TOTAL_SCORE=$((TOTAL_SCORE + DEP_SCORE))
-echo -e "📚 Dependencies:     ${DEP_COUNT} pkgs          ${DEP_COLOR}($DEP_SCORE/100)${NC}"
 
-# --- Real-World Pi 5 Performance Est. ---
-# Specs:
-# - SD Card: ~80MB/s Read (UHS-I)
-# - Network: ~100MB/s (Gigabit LAN)
-# - CPU Parse: ~5MB/s (Cortex-A76 estimate for complex JS)
+# ═══════════════════════════════════════════════════════
+# 4. PI 5 LOAD TIME ESTIMATE
+# ═══════════════════════════════════════════════════════
+JS_RAW=$(find .svelte-kit/output/client -name "*.js" -print0 2>/dev/null | xargs -0 cat 2>/dev/null | wc -c | tr -d ' ')
+JS_RAW_KB=$((JS_RAW / 1024))
+TOTAL_TRANSFER_KB=$((JS_KB + CSS_KB + ASSET_KB))
 
-TOTAL_BUNDLE_KB=$((JS_RAW_KB + CSS_GZIP_KB + ASSET_KB))
+TIME_DISK=$((TOTAL_TRANSFER_KB * 1000 / 80000))    # 80MB/s UHS-I SD
+TIME_NET=$((TOTAL_TRANSFER_KB * 1000 / 100000))     # 100MB/s GbE LAN
+TIME_PARSE=$((JS_RAW_KB * 1000 / 5000))              # ~5MB/s Cortex-A76 parse
 
-# Calculations in milliseconds
-TIME_DISK=$((TOTAL_BUNDLE_KB * 1000 / 80000)) # 80MB/s
-TIME_NETWORK=$((TOTAL_BUNDLE_KB * 1000 / 100000)) # 100MB/s (LAN)
-TIME_PARSE=$((JS_RAW_KB * 1000 / 5000)) # 5MB/s Parse Speed
-TOTAL_TIME=$((TIME_DISK + TIME_NETWORK + TIME_PARSE))
+# Add API latency if measured
+if [ "$BACKEND_RUNNING" = true ]; then
+  TIME_API=$API_AVG_MS
+else
+  TIME_API=0
+fi
+TOTAL_TIME=$((TIME_DISK + TIME_NET + TIME_PARSE + TIME_API))
 
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}   ⏱️  Real-World Pi 5 Load Time (Estimated)${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-if [ "$TOTAL_TIME" -lt 100 ]; then
-  TIME_COLOR=$GREEN
-  TIME_VERDICT="⚡ Instant"
-elif [ "$TOTAL_TIME" -lt 300 ]; then
-  TIME_COLOR=$GREEN
-  TIME_VERDICT="🚀 Very Fast"
-elif [ "$TOTAL_TIME" -lt 1000 ]; then
-  TIME_COLOR=$YELLOW
-  TIME_VERDICT="⚠️  Noticeable"
-else
-  TIME_COLOR=$RED
-  TIME_VERDICT="❌ Slow"
+hr
+echo -e "${B}   ⏱️  Pi 5 Estimated Cold Start${NC}"
+hr
+if [ "$TOTAL_TIME" -lt 100 ]; then TC=$G; TV="⚡ Instant"
+elif [ "$TOTAL_TIME" -lt 300 ]; then TC=$G; TV="🚀 Very Fast"
+elif [ "$TOTAL_TIME" -lt 1000 ]; then TC=$Y; TV="⚠️  Noticeable"
+else TC=$R; TV="❌ Slow"
 fi
+echo -e "   ${TC}~${TOTAL_TIME}ms (${TV})${NC}"
+echo -e "     Disk ${TIME_DISK}ms · Network ${TIME_NET}ms · Parse ${TIME_PARSE}ms · API ${TIME_API}ms"
 
-echo -e "   ${TIME_COLOR}Est. Cold Start:    ~${TOTAL_TIME}ms (${TIME_VERDICT})${NC}"
-echo -e "     • Disk Read (SD):   ${TIME_DISK}ms"
-echo -e "     • Network (LAN):    ${TIME_NETWORK}ms"
-echo -e "     • CPU Parse (A76):  ${TIME_PARSE}ms"
-
-# Final Score Calculation
-FINAL_SCORE=$((TOTAL_SCORE / METRICS_COUNT))
+# ═══════════════════════════════════════════════════════
+# FINAL WEIGHTED SCORE
+# ═══════════════════════════════════════════════════════
+if [ "$WEIGHT_SUM" -gt 0 ]; then
+  FINAL=$((WEIGHTED_TOTAL / WEIGHT_SUM))
+else
+  FINAL=0
+fi
 
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-# Grade
-if [ "$FINAL_SCORE" -ge 90 ]; then
-  GRADE="A+"
-  FINAL_COLOR=$GREEN
-  VERDICT="🚀 Perfect for Pi 5! Highly optimized."
-elif [ "$FINAL_SCORE" -ge 80 ]; then
-  GRADE="A"
-  FINAL_COLOR=$GREEN
-  VERDICT="✅ Excellent performance on Pi 5."
-elif [ "$FINAL_SCORE" -ge 70 ]; then
-  GRADE="B"
-  FINAL_COLOR=$GREEN
-  VERDICT="👍 Good. Solid performance."
-elif [ "$FINAL_SCORE" -ge 60 ]; then
-  GRADE="C"
-  FINAL_COLOR=$YELLOW
-  VERDICT="⚠️  Acceptable, but room for improvement."
-else
-  GRADE="F"
-  FINAL_COLOR=$RED
-  VERDICT="❌ Heavy. Will feel sluggish on Pi 5."
+hr
+if [ "$FINAL" -ge 90 ]; then   GRADE="A+"; FC=$G; V="🚀 Optimized for edge."
+elif [ "$FINAL" -ge 80 ]; then GRADE="A";  FC=$G; V="✅ Excellent for Pi 5."
+elif [ "$FINAL" -ge 70 ]; then GRADE="B";  FC=$G; V="👍 Solid performance."
+elif [ "$FINAL" -ge 50 ]; then GRADE="C";  FC=$Y; V="⚠️  Could be lighter."
+else                           GRADE="F";  FC=$R; V="❌ Too heavy for edge."
 fi
-
-echo -e "   ${FINAL_COLOR}FINAL SCORE: ${FINAL_SCORE}/100 (${GRADE})${NC}"
-echo -e "   ${VERDICT}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "   ${FC}SCORE: ${FINAL}/100 (${GRADE})${NC} — ${WEIGHT_SUM} weight across metrics"
+echo -e "   ${V}"
+hr

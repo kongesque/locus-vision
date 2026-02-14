@@ -8,18 +8,40 @@ It is built to be local-first, privacy-centric, and highly optimized for edge de
 
 | Category | Technology |
 |----------|------------|
-| Framework | SvelteKit 2 |
-| Language | TypeScript |
+| Frontend | SvelteKit 2, TypeScript |
 | Styling | Tailwind CSS 4 |
+| UI Components | shadcn-svelte |
+| Backend | FastAPI, Python |
+| Database | SQLite (async via aiosqlite) |
+| Auth | JWT (access + refresh tokens), Argon2id |
 | Build | Vite 7 |
 | Testing | Vitest |
 | Linting | ESLint + Prettier |
 
+## Features
+
+- **Live Stream** — real-time video feed monitoring
+- **Video Analytics** — structured data from video feeds
+- **Authentication** — JWT-based auth with HttpOnly cookies, auto-refresh
+- **Role-Based Access** — admin and viewer roles
+- **User Management** — admin panel for user CRUD, role assignment, activation
+- **Session Management** — view and revoke active sessions
+- **Signup Control** — admin toggle for public registration (disabled by default)
+- **Settings** — account management, password change, security controls
+
 ## Quick Start
 
 ```sh
+# Frontend
 pnpm install
 pnpm dev
+
+# Backend
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
 ## Scripts
@@ -32,3 +54,4 @@ pnpm dev
 | `pnpm test` | Run tests |
 | `pnpm lint` | Lint code |
 | `pnpm format` | Format code |
+| `pnpm benchmark` | Run build size & performance benchmark |
