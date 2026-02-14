@@ -4,6 +4,7 @@
 	import { cn } from '$lib/utils.js';
 	import PageTitle from '$lib/components/page-title-1.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 
 	let {
 		class: className = undefined
@@ -25,6 +26,7 @@
 		<PageTitle />
 	</div>
 	<div class="flex items-center gap-2">
+		<ThemeToggle />
 		<Button
 			variant="outline"
 			size="sm"
