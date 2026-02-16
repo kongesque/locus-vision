@@ -10,7 +10,9 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton class="pointer-events-none data-[slot=sidebar-menu-button]:!p-1">
 					<Echo class="!size-6" />
-					<span class="text-base font-semibold group-data-[collapsible=icon]:hidden">Locus</span>
+					<span class="text-base font-semibold group-data-[collapsible=icon]:hidden"
+						>LocusVision</span
+					>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
