@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import ButtonGroup from '$lib/components/ui/button-group/button-group.svelte';
-	import { Maximize, Minimize, Minus, Plus } from 'lucide-svelte';
+	import { Maximize, Minimize, Minus, Plus } from '@lucide/svelte';
 	import { fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
 

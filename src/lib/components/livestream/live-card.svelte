@@ -2,7 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import EchoLoader from '$lib/components/echo-loader.svelte';
-	import { CircleAlert } from 'lucide-svelte';
+	import { CircleAlert } from '@lucide/svelte';
 
 	interface LiveCardProps {
 		cameraId: string;

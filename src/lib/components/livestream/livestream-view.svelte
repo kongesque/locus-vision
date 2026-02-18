@@ -14,6 +14,7 @@
 
 	let { initialGridCols = 3 }: { initialGridCols?: number } = $props();
 
+	// svelte-ignore state_referenced_locally
 	let gridCols = $state(initialGridCols);
 
 	$effect(() => {
