@@ -1,0 +1,40 @@
+{
+    "cameras": [
+        {
+            "id": "cam-01",
+            "name": "Main Entrance",
+            "status": "live",
+            "thumbnail": "/locus.png"
+        },
+        {
+            "id": "cam-02",
+            "name": "Parking Lot A",
+            "status": "live",
+            "thumbnail": "/locus.png"
+        },
+        {
+            "id": "cam-03",
+            "name": "Warehouse Loading Dock",
+            "status": "live",
+            "thumbnail": "/locus.png"
+        },
+        {
+            "id": "cam-04",
+            "name": "Cafeteria",
+            "status": "offline",
+            "thumbnail": "/locus.png"
+        },
+        {
+            "id": "cam-05",
+            "name": "Server Room",
+            "status": "connecting",
+            "thumbnail": "/locus.png"
+        },
+        {
+            "id": "cam-06",
+            "name": "Elevator Lobby",
+            "status": "live",
+            "thumbnail": "/locus.png"
+        }
+    ]
+}
