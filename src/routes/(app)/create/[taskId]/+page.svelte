@@ -63,18 +63,46 @@
 		}
 	}
 
-	function handleProcess() {
-		// TODO: FastAPI Backend Integration
-		/*
-        fetch(`http://localhost:8000/api/video/${taskId}/process`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ zones, model: selectedModel }),
-        });
-        */
+	let isProcessing = $state(false);
 
-		// Redirect immediately to dashboard
-		goto('/video-analytics');
+	async function handleProcess() {
+		if (isProcessing) return;
+		if (!videoStore.videoUrl || videoStore.videoType !== 'file') {
+			alert('No video file selected');
+			return;
+		}
+
+		isProcessing = true;
+
+		try {
+			// Convert blob URL back to Blob/File for upload
+			// Note: This works because the blob URL is from the same session
+			const response = await fetch(videoStore.videoUrl);
+			const blob = await response.blob();
+			const file = new File([blob], 'video.mp4', { type: 'video/mp4' });
+
+			const formData = new FormData();
+			formData.append('video', file);
+			formData.append('zones', JSON.stringify(zones));
+			// You can also append 'model' or 'classes' if the backend supports it
+
+			const uploadRes = await fetch(`http://localhost:8000/api/video/${taskId}/process`, {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!uploadRes.ok) {
+				throw new Error('Processing failed');
+			}
+
+			// Redirect immediately to dashboard or task view
+			goto('/video-analytics');
+		} catch (error) {
+			console.error('Error processing video:', error);
+			alert('Failed to start processing');
+		} finally {
+			isProcessing = false;
+		}
 	}
 </script>
 
