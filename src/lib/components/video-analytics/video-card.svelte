@@ -30,15 +30,20 @@
 	}: Props = $props();
 
 	// Fallback image handling
-	let imgSrc = $state(thumbnail);
+	let imgFailed = $state(false);
+
 	function handleImgError() {
-		imgSrc = '/locus.png';
+		imgFailed = true;
 	}
 
-	// React to thumbnail prop changes
+	// Reset error state when thumbnail changes
 	$effect(() => {
-		imgSrc = thumbnail;
+		// Access thumbnail to track dependency
+		thumbnail;
+		imgFailed = false;
 	});
+
+	let finalSrc = $derived(imgFailed ? '/locus.png' : thumbnail);
 
 	let statusColor = $derived(
 		status === 'completed'
@@ -58,7 +63,7 @@
 			class="relative aspect-video cursor-pointer overflow-hidden rounded-xl bg-muted transition-all duration-300 group-hover:rounded-none"
 		>
 			<img
-				src={imgSrc}
+				src={finalSrc}
 				alt={name}
 				class="aspect-video w-full object-cover transition-opacity duration-300 group-hover:opacity-50"
 				onerror={handleImgError}

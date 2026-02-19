@@ -138,7 +138,7 @@ async def process_video_task(
         # Tracking state
         track_history = defaultdict(lambda: [])
         crossed_objects = {} # track_id -> bool (True if counted)
-    
+
         # Prepare zones
         parsed_zones = []
         for zone in zones:
@@ -149,7 +149,7 @@ async def process_video_task(
                 "id": zone.get("id"),
                 "classes": get_class_ids(model, zone.get("classes", []))
             })
-        
+    
         full_frame_class_ids = get_class_ids(model, full_frame_classes)
 
         frame_count = 0
@@ -159,7 +159,7 @@ async def process_video_task(
             success, frame = cap.read()
             if not success:
                 break
-        
+    
             frame_count += 1
             if frame_count % skip_interval != 0:
                 continue
@@ -174,24 +174,24 @@ async def process_video_task(
                    required_classes = None # None means track everything
                    break
                 required_classes.update(z["classes"])
-            
+        
             classes_arg = list(required_classes) if required_classes is not None else None
-        
+    
             results = model.track(frame, persist=True, tracker="bytetrack.yaml", verbose=False, classes=classes_arg)
-        
+    
             if results and results[0].boxes:
                 boxes = results[0].boxes.xywh.cpu().numpy()
                 track_ids = results[0].boxes.id
                 class_indices = results[0].boxes.cls.cpu().numpy() # Get detected class indices
-            
+        
                 if track_ids is not None:
                     track_ids = track_ids.int().cpu().tolist()
-                
+            
                     for box, track_id, cls_idx in zip(boxes, track_ids, class_indices):
                         cls_idx = int(cls_idx)
                         x, y, w, h = box
                         center = (int(x), int(y))
-                    
+                
                         track = track_history[track_id]
                         track.append(center)
                         if len(track) > 30:
@@ -199,21 +199,21 @@ async def process_video_task(
 
                         # Check zones
                         is_inside_target_zone = False
-                    
+                
                         for zone in parsed_zones:
                             # Check if this object's class matches the zone's filter
                             # If zone.classes is empty, it matches ALL
                             if zone["classes"] and cls_idx not in zone["classes"]:
                                 continue
-                            
+                        
                             # pointPolygonTest returns +1 (inside), -1 (outside), 0 (on edge)
                             dist = cv2.pointPolygonTest(zone["poly"], center, False)
-                        
+                    
                             if dist >= 0:
                                 is_inside_target_zone = True
                                 if track_id not in crossed_objects:
                                     crossed_objects[track_id] = True
-                    
+                
                         # Also check if it matches full frame filter (visualize differently?)
                         # For now just simple coloring logic
                         is_relevant = is_inside_target_zone or (not parsed_zones and (not full_frame_class_ids or cls_idx in full_frame_class_ids))
@@ -238,13 +238,13 @@ async def process_video_task(
 
         cap.release()
         out.release()
-    
+
         # Cleanup input
         if os.path.exists(input_path):
             os.remove(input_path)
-        
-        print(f"Processing complete for {task_id}. Time: {time.time() - start_time:.2f}s")
     
+        print(f"Processing complete for {task_id}. Time: {time.time() - start_time:.2f}s")
+
         # Update status to completed
         db = await get_db()
         try:
