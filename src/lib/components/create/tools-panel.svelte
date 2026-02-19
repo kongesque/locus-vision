@@ -13,7 +13,7 @@
 <script lang="ts">
 	import * as Card from '$lib/components/ui/card';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Button } from '$lib/components/ui/button';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -23,7 +23,7 @@
 	import { Input } from '$lib/components/ui/input';
 
 	// Icons
-	import { Trash2, Slash, Square, X, Info, Check, ChevronsUpDown } from 'lucide-svelte';
+	import { Trash2, Slash, Square, X, Info, Check, ChevronsUpDown } from '@lucide/svelte';
 
 	import { cn } from '$lib/utils';
 	import type { Zone } from './drawing-canvas.svelte';
@@ -110,11 +110,9 @@
 		<div class="mb-2 flex items-center justify-between">
 			<div class="font-semibold text-foreground">Model</div>
 			<Tooltip.Root>
-				<Tooltip.Trigger asChild let:builder>
-					<Button builders={[builder]} variant="ghost" size="icon">
-						<Info class="h-4 w-4" />
-						<span class="sr-only">Info</span>
-					</Button>
+				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+					<Info class="h-4 w-4" />
+					<span class="sr-only">Info</span>
 				</Tooltip.Trigger>
 				<Tooltip.Content side="left">
 					<p>Smaller = faster</p>
@@ -124,14 +122,14 @@
 		</div>
 
 		<Select.Root
-			selected={{
-				value: selectedModel,
-				label: YOLO_MODELS.find((m) => m.value === selectedModel)?.label
+			type="single"
+			bind:value={selectedModel}
+			onValueChange={(v) => {
+				if (v) onModelChange(v as YoloModel);
 			}}
-			onSelectedChange={(v) => v && onModelChange(v.value as YoloModel)}
 		>
 			<Select.Trigger class="h-auto w-full">
-				<Select.Value placeholder="Select model" />
+				<span>{YOLO_MODELS.find((m) => m.value === selectedModel)?.label || 'Select model'}</span>
 			</Select.Trigger>
 			<Select.Content>
 				{#each YOLO_MODELS as model}
@@ -153,11 +151,9 @@
 		<div class="mb-2 flex items-center justify-between">
 			<div class="font-semibold text-foreground">Tools</div>
 			<Tooltip.Root>
-				<Tooltip.Trigger asChild let:builder>
-					<Button builders={[builder]} variant="ghost" size="icon">
-						<Info class="h-4 w-4" />
-						<span class="sr-only">Info</span>
-					</Button>
+				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+					<Info class="h-4 w-4" />
+					<span class="sr-only">Info</span>
 				</Tooltip.Trigger>
 				<Tooltip.Content side="left">
 					<p>Zone = detect in specific areas.</p>
@@ -285,28 +281,27 @@
 																(v) => (openZoneCombobox = v ? zone.id : null)
 															}
 														>
-															<Popover.Trigger asChild let:builder>
-																<Button
-																	builders={[builder]}
-																	variant="outline"
-																	role="combobox"
-																	aria-expanded={openZoneCombobox === zone.id}
-																	class="h-auto min-h-[32px] w-full justify-between px-2 py-1 text-xs"
-																>
-																	<div class="flex flex-wrap gap-1">
-																		{#if zone.classes.length === 0}
-																			Filter classes...
-																		{:else}
-																			{#each zone.classes as cls}
-																				<span
-																					class="rounded bg-secondary px-1 font-mono text-[10px] text-secondary-foreground"
-																					>{cls}</span
-																				>
-																			{/each}
-																		{/if}
-																	</div>
-																	<ChevronsUpDown class="ml-2 h-3 w-3 shrink-0 opacity-50" />
-																</Button>
+															<Popover.Trigger
+																role="combobox"
+																aria-expanded={openZoneCombobox === zone.id}
+																class={cn(
+																	buttonVariants({ variant: 'outline' }),
+																	'h-auto min-h-[32px] w-full justify-between px-2 py-1 text-xs'
+																)}
+															>
+																<div class="flex flex-wrap gap-1">
+																	{#if zone.classes.length === 0}
+																		Filter classes...
+																	{:else}
+																		{#each zone.classes as cls}
+																			<span
+																				class="rounded bg-secondary px-1 font-mono text-[10px] text-secondary-foreground"
+																				>{cls}</span
+																			>
+																		{/each}
+																	{/if}
+																</div>
+																<ChevronsUpDown class="ml-2 h-3 w-3 shrink-0 opacity-50" />
 															</Popover.Trigger>
 															<Popover.Content class="w-[200px] p-0">
 																<Command.Root>
@@ -367,28 +362,27 @@
 							</div>
 							<div class="px-2.5 pt-0 pb-2.5">
 								<Popover.Root bind:open={openFullFrameCombobox}>
-									<Popover.Trigger asChild let:builder>
-										<Button
-											builders={[builder]}
-											variant="outline"
-											role="combobox"
-											aria-expanded={openFullFrameCombobox}
-											class="h-auto min-h-[32px] w-full justify-between px-2 py-1 text-xs"
-										>
-											<div class="flex flex-wrap gap-1">
-												{#if fullFrameClasses.length === 0}
-													Filter classes...
-												{:else}
-													{#each fullFrameClasses as cls}
-														<span
-															class="rounded bg-secondary px-1 font-mono text-[10px] text-secondary-foreground"
-															>{cls}</span
-														>
-													{/each}
-												{/if}
-											</div>
-											<ChevronsUpDown class="ml-2 h-3 w-3 shrink-0 opacity-50" />
-										</Button>
+									<Popover.Trigger
+										role="combobox"
+										aria-expanded={openFullFrameCombobox}
+										class={cn(
+											buttonVariants({ variant: 'outline' }),
+											'h-auto min-h-[32px] w-full justify-between px-2 py-1 text-xs'
+										)}
+									>
+										<div class="flex flex-wrap gap-1">
+											{#if fullFrameClasses.length === 0}
+												Filter classes...
+											{:else}
+												{#each fullFrameClasses as cls}
+													<span
+														class="rounded bg-secondary px-1 font-mono text-[10px] text-secondary-foreground"
+														>{cls}</span
+													>
+												{/each}
+											{/if}
+										</div>
+										<ChevronsUpDown class="ml-2 h-3 w-3 shrink-0 opacity-50" />
 									</Popover.Trigger>
 									<Popover.Content class="w-[200px] p-0">
 										<Command.Root>
@@ -429,4 +423,3 @@
 		<Button class="h-12 w-full" disabled={zones.length === 0} onclick={onProcess}>Process</Button>
 	</div>
 </Card.Root>
-```
