@@ -47,3 +47,6 @@ Thumbs.db
 bundle-stats.html
 .vscode/
 .idea/
+
+# Backend Data
+/backend/data/

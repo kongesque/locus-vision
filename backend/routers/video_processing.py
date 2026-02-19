@@ -15,8 +15,10 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-CACHE_DIR = "static/files/output"
+CACHE_DIR = "data/videos"
+MODELS_DIR = "data/models"
 os.makedirs(CACHE_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
 
 # COCO Class mapping (simplified for demo)
 # In reality, you'd want a robust mapping or pass class IDs directly from frontend
@@ -47,17 +49,37 @@ loaded_models = {}
 def get_model(model_name: str):
     if model_name not in loaded_models:
         print(f"Loading model: {model_name}")
+        model_path = os.path.join(MODELS_DIR, f"{model_name}.pt")
+        
+        # If model doesn't exist in data/models, try to load it normally (which might download to CWD)
+        # then move it? Or just let ultralytics handle it?
+        # Ultralytics downloads to CWD by default.
+        # Let's try to specifying the full path for loading.
+        # If it doesn't exist, we might need to download it manually or let ultralytics download to CWD and move it.
+        # Simpler approach: Just use CWD for download, then start using it. 
+        # But user wants organization.
+        
         try:
-             # Map frontend model names to ultralytics paths if needed
-             # strict matching for now: yolo11n -> yolo11n.pt (assuming available or auto-download)
-             # Fallback to yolov8n if 11 not explicitly available in environment or handling
-             if "yolo11" in model_name: 
-                 # Ultralytics 8.3+ supports yolo11. 
-                 pass 
-             loaded_models[model_name] = YOLO(f"{model_name}.pt")
+             # Check if we have it in our models dir
+             if os.path.exists(model_path):
+                 loaded_models[model_name] = YOLO(model_path)
+             else:
+                 # It's not there. Let YOLO download it.
+                 # YOLO(model_name) usually downloads to current dir.
+                 print(f"Model {model_name} not found in {MODELS_DIR}, downloading...")
+                 temp_model = YOLO(f"{model_name}.pt") 
+                 # Move the downloaded file to models dir
+                 if os.path.exists(f"{model_name}.pt"):
+                     os.rename(f"{model_name}.pt", model_path)
+                     # Reload from new path to be sure
+                     loaded_models[model_name] = YOLO(model_path)
+                 else:
+                     loaded_models[model_name] = temp_model
+
         except Exception as e:
             print(f"Error loading {model_name}, falling back to yolov8n. Error: {e}")
             loaded_models[model_name] = YOLO("yolov8n.pt")
+            
     return loaded_models[model_name]
 
 def process_video_task(
