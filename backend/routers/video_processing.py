@@ -20,27 +20,22 @@ MODELS_DIR = "data/models"
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-# COCO Class mapping (simplified for demo)
-# In reality, you'd want a robust mapping or pass class IDs directly from frontend
-COCO_CLASSES = {
-    "person": 0, "bicycle": 1, "car": 2, "motorcycle": 3, "airplane": 4, "bus": 5, "train": 6, "truck": 7, "boat": 8,
-    "traffic light": 9, "fire hydrant": 10, "stop sign": 11, "parking meter": 12, "bench": 13, "bird": 14, "cat": 15,
-    "dog": 16, "horse": 17, "sheep": 18, "cow": 19, "elephant": 20, "bear": 21, "zebra": 22, "giraffe": 23,
-    "backpack": 24, "umbrella": 25, "handbag": 26, "tie": 27, "suitcase": 28, "frisbee": 29, "skis": 30,
-    "snowboard": 31, "sports ball": 32, "kite": 33, "baseball bat": 34, "baseball glove": 35, "skateboard": 36,
-    "surfboard": 37, "tennis racket": 38, "bottle": 39, "wine glass": 40, "cup": 41, "fork": 42, "knife": 43,
-    "spoon": 44, "bowl": 45, "banana": 46, "apple": 47, "sandwich": 48, "orange": 49, "broccoli": 50, "carrot": 51,
-    "hot dog": 52, "pizza": 53, "donut": 54, "cake": 55, "chair": 56, "couch": 57, "potted plant": 58, "bed": 59,
-    "dining table": 60, "toilet": 61, "tv": 62, "laptop": 63, "mouse": 64, "remote": 65, "keyboard": 66, "cell phone": 67,
-    "microwave": 68, "oven": 69, "toaster": 70, "sink": 71, "refrigerator": 72, "book": 73, "clock": 74, "vase": 75,
-    "scissors": 76, "teddy bear": 77, "hair drier": 78, "toothbrush": 79
-}
-
-def get_class_ids(class_names: List[str]) -> List[int]:
+def get_class_ids(model, class_names: List[str]) -> List[int]:
+    """
+    Get class IDs from model definition based on class names.
+    """
+    if not class_names:
+        return []
+        
+    # Invert model.names: {id: name} -> {name: id}
+    # Ensure names are lowercased for comparison if needed, or exact match
+    # class_names from frontend might be loose, but usually match model.names
+    name_to_id = {v: k for k, v in model.names.items()}
+    
     ids = []
     for name in class_names:
-        if name in COCO_CLASSES:
-            ids.append(COCO_CLASSES[name])
+        if name in name_to_id:
+            ids.append(name_to_id[name])
     return ids
 
 # Cache models to avoid reloading
@@ -51,27 +46,17 @@ def get_model(model_name: str):
         print(f"Loading model: {model_name}")
         model_path = os.path.join(MODELS_DIR, f"{model_name}.pt")
         
-        # If model doesn't exist in data/models, try to load it normally (which might download to CWD)
-        # then move it? Or just let ultralytics handle it?
-        # Ultralytics downloads to CWD by default.
-        # Let's try to specifying the full path for loading.
-        # If it doesn't exist, we might need to download it manually or let ultralytics download to CWD and move it.
-        # Simpler approach: Just use CWD for download, then start using it. 
-        # But user wants organization.
         
         try:
              # Check if we have it in our models dir
              if os.path.exists(model_path):
                  loaded_models[model_name] = YOLO(model_path)
              else:
-                 # It's not there. Let YOLO download it.
-                 # YOLO(model_name) usually downloads to current dir.
                  print(f"Model {model_name} not found in {MODELS_DIR}, downloading...")
+                 # YOLO downloads to CWD, move it to models dir
                  temp_model = YOLO(f"{model_name}.pt") 
-                 # Move the downloaded file to models dir
                  if os.path.exists(f"{model_name}.pt"):
                      os.rename(f"{model_name}.pt", model_path)
-                     # Reload from new path to be sure
                      loaded_models[model_name] = YOLO(model_path)
                  else:
                      loaded_models[model_name] = temp_model
@@ -127,10 +112,10 @@ def process_video_task(
             "poly": pts,
             "color": (0, 255, 0), # Default color
             "id": zone.get("id"),
-            "classes": get_class_ids(zone.get("classes", []))
+            "classes": get_class_ids(model, zone.get("classes", []))
         })
         
-    full_frame_class_ids = get_class_ids(full_frame_classes)
+    full_frame_class_ids = get_class_ids(model, full_frame_classes)
 
     frame_count = 0
     start_time = time.time()
