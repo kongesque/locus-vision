@@ -17,6 +17,51 @@ router = APIRouter(
 # Format: { "camera_id": [WebSocket, ...] }
 active_connections: Dict[str, List[WebSocket]] = {}
 
+
+@router.post("/preview")
+async def preview_stream(body: dict):
+    """
+    Grab a single snapshot frame from an RTSP/HTTP stream URL.
+    Returns the frame as a base64 JPEG data URI for frontend preview.
+    """
+    import cv2
+    import base64
+    import numpy as np
+
+    url = body.get("url", "")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    try:
+        cap = cv2.VideoCapture(url)
+        # Give the stream a moment to connect
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        if not cap.isOpened():
+            raise HTTPException(status_code=422, detail="Could not connect to stream")
+
+        ret, frame = cap.read()
+        cap.release()
+
+        if not ret or frame is None:
+            raise HTTPException(status_code=422, detail="Failed to read frame from stream")
+
+        # Encode as JPEG
+        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        b64 = base64.b64encode(buffer).decode('utf-8')
+
+        h, w = frame.shape[:2]
+        return JSONResponse({
+            "status": "ok",
+            "image": f"data:image/jpeg;base64,{b64}",
+            "resolution": {"w": w, "h": h}
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Preview failed: {str(e)}")
+
+
 @router.post("/", response_model=Camera)
 async def create_camera(camera: CameraCreate):
     """

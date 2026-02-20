@@ -18,6 +18,36 @@
 	// RTSP form fields
 	let rtspName = $state('');
 	let rtspUrl = $state('');
+	let rtspPreview = $state<string | null>(null);
+	let rtspPreviewError = $state<string | null>(null);
+	let isTesting = $state(false);
+
+	async function testRtspConnection() {
+		if (!rtspUrl.trim()) return;
+		try {
+			isTesting = true;
+			rtspPreviewError = null;
+			rtspPreview = null;
+
+			const res = await fetch('http://localhost:8000/api/cameras/preview', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ url: rtspUrl })
+			});
+
+			if (!res.ok) {
+				const err = await res.json();
+				throw new Error(err.detail || 'Connection failed');
+			}
+
+			const data = await res.json();
+			rtspPreview = data.image;
+		} catch (err) {
+			rtspPreviewError = err instanceof Error ? err.message : 'Connection failed';
+		} finally {
+			isTesting = false;
+		}
+	}
 
 	// Webcam form fields
 	let webcamName = $state('');
@@ -184,12 +214,39 @@
 				</div>
 				<div class="space-y-2">
 					<Label for="rtsp-url">Stream URL</Label>
-					<Input
-						id="rtsp-url"
-						placeholder="rtsp://admin:password@192.168.1.10:554/stream"
-						bind:value={rtspUrl}
-						disabled={isConnecting}
-					/>
+					<div class="flex gap-2">
+						<Input
+							id="rtsp-url"
+							placeholder="rtsp://admin:password@192.168.1.10:554/stream"
+							bind:value={rtspUrl}
+							disabled={isConnecting || isTesting}
+							class="flex-1"
+						/>
+						<Button
+							variant="outline"
+							class="shrink-0 cursor-pointer"
+							onclick={testRtspConnection}
+							disabled={!rtspUrl.trim() || isTesting || isConnecting}
+						>
+							{isTesting ? 'Testing...' : 'Test'}
+						</Button>
+					</div>
+				</div>
+
+				<div
+					class="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-black"
+				>
+					{#if rtspPreviewError}
+						<div class="px-4 text-center text-sm text-red-500">{rtspPreviewError}</div>
+					{:else if rtspPreview}
+						<img src={rtspPreview} alt="RTSP Preview" class="h-full w-full object-cover" />
+					{:else if isTesting}
+						<div class="animate-pulse text-sm text-muted-foreground">Connecting to stream...</div>
+					{:else}
+						<div class="text-sm text-muted-foreground">
+							Enter a stream URL and click Test to preview
+						</div>
+					{/if}
 				</div>
 			</Tabs.Content>
 
