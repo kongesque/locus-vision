@@ -1,8 +1,10 @@
 import json
 import time
 import asyncio
-from fastapi import APIRouter, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+import httpx
+from urllib.parse import quote, unquote, urljoin
+from fastapi import APIRouter, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Request, Query
+from fastapi.responses import JSONResponse, Response
 from typing import List, Dict
 
 from database import get_db
@@ -17,6 +19,54 @@ router = APIRouter(
 # In-memory registry of active WebSocket connections for camera analytics
 # Format: { "camera_id": [WebSocket, ...] }
 active_connections: Dict[str, List[WebSocket]] = {}
+
+# Shared HTTP client for HLS proxying (connection pooling)
+_http_client = httpx.AsyncClient(timeout=15.0, follow_redirects=True)
+
+
+@router.get("/hls-proxy")
+async def hls_proxy(url: str = Query(..., description="Remote HLS URL to proxy")):
+    """
+    CORS proxy for HLS manifests and segments.
+    Fetches the remote URL server-side and returns it with proper headers.
+    For .m3u8 manifests, rewrites segment URLs to route through this proxy.
+    """
+    try:
+        resp = await _http_client.get(url)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=f"Upstream error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Proxy error: {str(e)}")
+
+    content_type = resp.headers.get("content-type", "application/octet-stream")
+    body = resp.content
+
+    # If this is a manifest, rewrite segment URLs to route through this proxy
+    if "mpegurl" in content_type.lower() or url.endswith(".m3u8"):
+        text = body.decode("utf-8", errors="replace")
+        lines = text.splitlines()
+        rewritten = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                # This is a URL line — make it absolute, then wrap in proxy
+                abs_url = urljoin(url, stripped)
+                proxied = f"/api/cameras/hls-proxy?url={quote(abs_url, safe='')}"
+                rewritten.append(proxied)
+            else:
+                rewritten.append(line)
+        body = "\n".join(rewritten).encode("utf-8")
+        content_type = "application/vnd.apple.mpegurl"
+
+    return Response(
+        content=body,
+        media_type=content_type,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache",
+        }
+    )
 
 
 @router.post("/preview")

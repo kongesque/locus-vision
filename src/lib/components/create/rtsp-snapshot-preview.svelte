@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DrawingCanvas, { type Point, type Zone } from './drawing-canvas.svelte';
 	import { onMount } from 'svelte';
+	import Hls from 'hls.js';
 
 	interface Props {
 		url: string;
@@ -25,41 +26,44 @@
 	}: Props = $props();
 
 	let containerRef: HTMLDivElement | undefined = $state();
-	let imgRef: HTMLImageElement | undefined = $state();
+	let videoRef: HTMLVideoElement | undefined = $state();
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
-	let imageDims = $state<{
+	let videoDims = $state<{
 		width: number;
 		height: number;
 		naturalWidth: number;
 		naturalHeight: number;
 	} | null>(null);
 
-	// MJPEG stream URL — the browser's <img> tag handles multipart/x-mixed-replace natively
-	const streamUrl = $derived(`http://localhost:8000/api/cameras/stream/${cameraId}`);
+	let hlsInstance: Hls | null = null;
+
+	function isHlsUrl(src: string): boolean {
+		return src.includes('.m3u8') || src.includes('manifest') || src.includes('hls');
+	}
 
 	function updateDims() {
-		if (!imgRef || !containerRef) return;
+		if (!videoRef || !containerRef) return;
 
 		const { width: cw, height: ch } = containerRef.getBoundingClientRect();
-		const nw = imgRef.naturalWidth;
-		const nh = imgRef.naturalHeight;
+		const nw = videoRef.videoWidth;
+		const nh = videoRef.videoHeight;
 
 		if (nw === 0 || nh === 0) return;
 
 		const containerRatio = cw / ch;
-		const imageRatio = nw / nh;
+		const videoRatio = nw / nh;
 
 		let displayW = cw;
 		let displayH = ch;
 
-		if (containerRatio > imageRatio) {
-			displayW = ch * imageRatio;
+		if (containerRatio > videoRatio) {
+			displayW = ch * videoRatio;
 		} else {
-			displayH = cw / imageRatio;
+			displayH = cw / videoRatio;
 		}
 
-		imageDims = {
+		videoDims = {
 			width: displayW,
 			height: displayH,
 			naturalWidth: nw,
@@ -67,22 +71,86 @@
 		};
 	}
 
-	function handleLoad() {
-		isLoading = false;
-		error = null;
-		updateDims();
-	}
+	function initStream() {
+		if (!videoRef || !url) return;
 
-	function handleError() {
-		isLoading = false;
-		error = 'Could not connect to stream. Check the URL and backend.';
+		// Clean up previous instance
+		if (hlsInstance) {
+			hlsInstance.destroy();
+			hlsInstance = null;
+		}
+
+		if (isHlsUrl(url)) {
+			// Route through our backend proxy to bypass CORS
+			const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(url)}`;
+
+			if (Hls.isSupported()) {
+				hlsInstance = new Hls({
+					lowLatencyMode: true,
+					enableWorker: true,
+					backBufferLength: 0,
+					maxBufferLength: 2,
+					maxMaxBufferLength: 4,
+					liveSyncDurationCount: 1,
+					liveMaxLatencyDurationCount: 3,
+					liveDurationInfinity: true,
+					maxBufferSize: 0,
+					startFragPrefetch: true
+				});
+
+				hlsInstance.loadSource(proxyUrl);
+				hlsInstance.attachMedia(videoRef);
+
+				hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+					isLoading = false;
+					videoRef?.play().catch(() => {});
+				});
+
+				hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
+					if (data.fatal) {
+						isLoading = false;
+						error = `Stream error: ${data.details}`;
+						console.error('HLS fatal error:', data);
+					}
+				});
+			} else if (videoRef.canPlayType('application/vnd.apple.mpegurl')) {
+				// Safari native HLS — also through proxy
+				videoRef.src = proxyUrl;
+				videoRef.addEventListener('loadedmetadata', () => {
+					isLoading = false;
+					videoRef?.play().catch(() => {});
+				});
+			} else {
+				error = 'HLS not supported in this browser';
+				isLoading = false;
+			}
+		} else {
+			// Direct URL (RTSP won't work in browser, but HTTP streams might)
+			// Fall back to MJPEG backend proxy for true RTSP
+			videoRef.src = `http://localhost:8000/api/cameras/stream/${cameraId}`;
+			videoRef.addEventListener('loadedmetadata', () => {
+				isLoading = false;
+			});
+			videoRef.addEventListener('error', () => {
+				isLoading = false;
+				error = 'Could not play stream. True RTSP requires a transcoder (go2rtc/ffmpeg).';
+			});
+		}
 	}
 
 	onMount(() => {
+		initStream();
+
 		const observer = new ResizeObserver(updateDims);
 		if (containerRef) observer.observe(containerRef);
 
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			if (hlsInstance) {
+				hlsInstance.destroy();
+				hlsInstance = null;
+			}
+		};
 	});
 </script>
 
@@ -91,38 +159,43 @@
 	class="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg bg-black"
 >
 	{#if error}
-		<div class="flex flex-col items-center gap-3 text-center">
+		<div class="flex flex-col items-center gap-3 p-4 text-center">
 			<p class="text-sm text-red-500">{error}</p>
 			<p class="max-w-[300px] text-xs break-all text-muted-foreground">{url}</p>
 		</div>
 	{:else}
 		{#if isLoading}
-			<div class="absolute z-20 animate-pulse text-sm text-muted-foreground">
-				Connecting to live stream...
+			<div class="absolute z-20 flex flex-col items-center gap-2">
+				<div
+					class="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
+				></div>
+				<span class="text-sm text-muted-foreground">Connecting to stream...</span>
 			</div>
 		{/if}
 
-		<!-- MJPEG live stream: the browser natively handles multipart/x-mixed-replace as a live updating image -->
-		<img
-			bind:this={imgRef}
-			src={streamUrl}
-			alt="Live RTSP stream"
+		<!-- Native video playback — full FPS, hardware decoded -->
+		<!-- svelte-ignore a11y_media_has_caption -->
+		<video
+			bind:this={videoRef}
 			class="pointer-events-none max-h-full max-w-full object-contain"
-			onload={handleLoad}
-			onerror={handleError}
-		/>
+			autoplay
+			playsinline
+			muted
+			onloadedmetadata={updateDims}
+			onresize={updateDims}
+		></video>
 
 		<!-- Drawing Canvas Overlay -->
-		{#if imageDims}
+		{#if videoDims}
 			<div
 				class="absolute z-10 flex items-center justify-center"
-				style="width: {imageDims.width}px; height: {imageDims.height}px;"
+				style="width: {videoDims.width}px; height: {videoDims.height}px;"
 			>
 				<DrawingCanvas
-					width={imageDims.width}
-					height={imageDims.height}
-					videoWidth={imageDims.naturalWidth}
-					videoHeight={imageDims.naturalHeight}
+					width={videoDims.width}
+					height={videoDims.height}
+					videoWidth={videoDims.naturalWidth}
+					videoHeight={videoDims.naturalHeight}
 					{zones}
 					{selectedZoneId}
 					{drawingMode}
