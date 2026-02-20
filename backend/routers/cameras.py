@@ -4,7 +4,7 @@ import asyncio
 import httpx
 from urllib.parse import quote, unquote, urljoin
 from fastapi import APIRouter, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Request, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from typing import List, Dict
 
 from database import get_db
@@ -21,18 +21,26 @@ router = APIRouter(
 active_connections: Dict[str, List[WebSocket]] = {}
 
 # Shared HTTP client for HLS proxying (connection pooling)
-_http_client = httpx.AsyncClient(timeout=15.0, follow_redirects=True)
-
+_http_client = httpx.AsyncClient(timeout=10.0, follow_redirects=True)
 
 @router.get("/hls-proxy")
-async def hls_proxy(url: str = Query(..., description="Remote HLS URL to proxy")):
+async def hls_proxy(request: Request, url: str = Query(..., description="Remote HLS URL to proxy")):
     """
     CORS proxy for HLS manifests and segments.
-    Fetches the remote URL server-side and returns it with proper headers.
-    For .m3u8 manifests, rewrites segment URLs to route through this proxy.
+    Streams video segments to reduce latency and memory usage.
+    For .m3u8 manifests, rewrites segment URLs.
     """
+    # Forward some harmless headers to avoid being blocked/throttled by CDNs
+    fwd_headers = {
+        "User-Agent": request.headers.get("user-agent", "Mozilla/5.0"),
+        "Accept": "*/*",
+        "Accept-Language": request.headers.get("accept-language", "en-US,en;q=0.9"),
+        "Origin": "https://www.youtube.com",
+    }
+    
     try:
-        resp = await _http_client.get(url)
+        req = _http_client.build_request("GET", url, headers=fwd_headers)
+        resp = await _http_client.send(req, stream=True)
         resp.raise_for_status()
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Upstream error: {e}")
@@ -40,31 +48,44 @@ async def hls_proxy(url: str = Query(..., description="Remote HLS URL to proxy")
         raise HTTPException(status_code=502, detail=f"Proxy error: {str(e)}")
 
     content_type = resp.headers.get("content-type", "application/octet-stream")
-    body = resp.content
 
-    # If this is a manifest, rewrite segment URLs to route through this proxy
+    # If this is a manifest, we must read the whole thing to rewrite it.
     if "mpegurl" in content_type.lower() or url.endswith(".m3u8"):
-        text = body.decode("utf-8", errors="replace")
+        await resp.aread()
+        text = resp.text
         lines = text.splitlines()
         rewritten = []
         for line in lines:
             stripped = line.strip()
             if stripped and not stripped.startswith("#"):
-                # This is a URL line — make it absolute, then wrap in proxy
                 abs_url = urljoin(url, stripped)
                 proxied = f"/api/cameras/hls-proxy?url={quote(abs_url, safe='')}"
                 rewritten.append(proxied)
             else:
                 rewritten.append(line)
         body = "\n".join(rewritten).encode("utf-8")
-        content_type = "application/vnd.apple.mpegurl"
+        
+        return Response(
+            content=body,
+            media_type="application/vnd.apple.mpegurl",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-cache",
+            }
+        )
+    
+    # If it's a video segment (.ts, .m4s), stream it directly to the client
+    # This prevents the stream from stuttering by lowering Time-To-First-Byte
+    async def stream_generator():
+        async for chunk in resp.aiter_bytes():
+            yield chunk
 
-    return Response(
-        content=body,
+    return StreamingResponse(
+        stream_generator(),
         media_type=content_type,
         headers={
             "Access-Control-Allow-Origin": "*",
-            "Cache-Control": "no-cache",
+            "Cache-Control": "public, max-age=3600",
         }
     )
 
