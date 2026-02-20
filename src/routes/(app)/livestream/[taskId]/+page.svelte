@@ -2,20 +2,27 @@
 	import { page } from '$app/stores';
 	import { AspectRatio } from '$lib/components/ui/aspect-ratio';
 	import { videoStore } from '$lib/stores/video.svelte';
+	import Hls from 'hls.js';
 
 	const taskId = $derived($page.params.taskId);
 
 	let cameraName = $state('Loading...');
 	let cameraStatus = $state('connecting');
 	let cameraType = $state<'webcam' | 'rtsp'>('webcam');
+	let cameraUrl = $state('');
 	let modelName = $state('yolo11n');
 	let errorMsg = $state<string | null>(null);
 	let zones = $state<any[]>([]);
 	let trackCount = $state(0);
 
-	// Action for initializing the camera feed (works on both <video> and <div>)
-	function videoAction(node: HTMLElement) {
+	function isHlsUrl(src: string): boolean {
+		return src.includes('.m3u8') || src.includes('manifest') || src.includes('hls');
+	}
+
+	// Action for initializing the camera feed
+	function videoAction(node: HTMLVideoElement) {
 		let isDestroyed = false;
+		let hlsInstance: Hls | null = null;
 
 		const initVideo = async () => {
 			try {
@@ -25,10 +32,11 @@
 				const camera = await res.json();
 				cameraName = camera.name;
 				cameraType = camera.type;
+				cameraUrl = camera.url || '';
 				modelName = camera.model_name || 'yolo11n';
 				zones = camera.zones || [];
 
-				if (camera.type === 'webcam' && node instanceof HTMLVideoElement) {
+				if (camera.type === 'webcam') {
 					if (videoStore.videoStream) {
 						node.srcObject = videoStore.videoStream;
 						cameraStatus = 'live';
@@ -50,8 +58,48 @@
 							cameraStatus = 'error';
 						}
 					}
-				} else if (camera.type === 'rtsp') {
-					cameraStatus = 'live';
+				} else if (camera.type === 'rtsp' && camera.url) {
+					// Play HLS/RTSP stream in the <video> element
+					if (isHlsUrl(camera.url)) {
+						const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(camera.url)}`;
+
+						if (Hls.isSupported()) {
+							hlsInstance = new Hls({
+								lowLatencyMode: true,
+								enableWorker: true,
+								backBufferLength: 0,
+								maxBufferLength: 2,
+								maxMaxBufferLength: 4,
+								liveSyncDurationCount: 1,
+								liveMaxLatencyDurationCount: 3,
+								liveDurationInfinity: true,
+								maxBufferSize: 0,
+								startFragPrefetch: true
+							});
+							hlsInstance.loadSource(proxyUrl);
+							hlsInstance.attachMedia(node);
+							hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+								cameraStatus = 'live';
+								node.play().catch(() => {});
+							});
+							hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
+								if (data.fatal) {
+									console.error('HLS error:', data);
+									errorMsg = `Stream error: ${data.details}`;
+									cameraStatus = 'error';
+								}
+							});
+						} else if (node.canPlayType('application/vnd.apple.mpegurl')) {
+							node.src = proxyUrl;
+							node.addEventListener('loadedmetadata', () => {
+								cameraStatus = 'live';
+								node.play().catch(() => {});
+							});
+						}
+					} else {
+						// Non-HLS RTSP — can't play directly in browser
+						cameraStatus = 'live';
+					}
 				}
 			} catch (err) {
 				if (isDestroyed) return;
@@ -66,6 +114,10 @@
 		return {
 			destroy() {
 				isDestroyed = true;
+				if (hlsInstance) {
+					hlsInstance.destroy();
+					hlsInstance = null;
+				}
 			}
 		};
 	}
@@ -105,7 +157,6 @@
 					return;
 				}
 
-				// Start sending frames at ~8 FPS
 				captureInterval = setInterval(() => {
 					if (!videoEl || videoEl.readyState < 2 || ws.readyState !== WebSocket.OPEN) return;
 
@@ -124,12 +175,10 @@
 					);
 				}, 125); // ~8 FPS
 			}
-			// For RTSP, the backend thread pushes analytics — we just listen
 		};
 
 		ws.onmessage = (event) => {
 			try {
-				// Handle both text (RTSP push) and JSON string responses
 				const raw = typeof event.data === 'string' ? event.data : '';
 				const data = JSON.parse(raw);
 				if (data.resolution) videoRes = data.resolution;
@@ -166,7 +215,6 @@
 		const scaleX = canvas.width / videoRes.w;
 		const scaleY = canvas.height / videoRes.h;
 
-		// Draw configured zones
 		zones.forEach((zone) => {
 			if (!zone.points || zone.points.length < 2) return;
 
@@ -186,7 +234,6 @@
 			ctx.setLineDash([]);
 		});
 
-		// Draw bounding boxes
 		boxes.forEach((box) => {
 			ctx.strokeStyle = '#ff0000';
 			ctx.lineWidth = 2;
@@ -241,22 +288,10 @@
 		<div class="mx-auto flex w-full max-w-5xl flex-col gap-4">
 			<div class="relative overflow-hidden rounded-lg border bg-black shadow-lg">
 				<AspectRatio ratio={16 / 9} class="group relative max-h-[80vh]">
-					{#if cameraType === 'webcam'}
-						<video use:videoAction class="h-full w-full object-contain" autoplay playsinline muted
-						></video>
-					{:else}
-						<!-- RTSP: no browser-side video stream; show info overlay on the canvas -->
-						<div
-							use:videoAction
-							class="flex h-full w-full items-center justify-center text-muted-foreground"
-						>
-							{#if cameraStatus === 'connecting'}
-								<span class="animate-pulse">Connecting to RTSP stream...</span>
-							{:else if cameraStatus === 'live'}
-								<span class="text-sm opacity-50">RTSP — Backend processing active</span>
-							{/if}
-						</div>
-					{/if}
+					<!-- Single <video> element for both webcam and RTSP/HLS -->
+					<!-- svelte-ignore a11y_media_has_caption -->
+					<video use:videoAction class="h-full w-full object-contain" autoplay playsinline muted
+					></video>
 
 					<canvas use:overlayAction class="pointer-events-none absolute top-0 left-0 h-full w-full"
 					></canvas>
