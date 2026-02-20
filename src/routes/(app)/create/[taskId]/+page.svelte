@@ -127,6 +127,7 @@
 		<!-- Left: Video Canvas -->
 		<Card.Root class="flex flex-[3] flex-col overflow-hidden p-0">
 			<VideoPreview
+				cameraId={taskId}
 				{zones}
 				{selectedZoneId}
 				{drawingMode}

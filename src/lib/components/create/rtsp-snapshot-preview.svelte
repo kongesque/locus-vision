@@ -4,6 +4,7 @@
 
 	interface Props {
 		url: string;
+		cameraId: string;
 		zones: Zone[];
 		selectedZoneId: string | null;
 		drawingMode: 'polygon' | 'line';
@@ -14,6 +15,7 @@
 
 	let {
 		url,
+		cameraId,
 		zones,
 		selectedZoneId,
 		drawingMode,
@@ -24,8 +26,7 @@
 
 	let containerRef: HTMLDivElement | undefined = $state();
 	let imgRef: HTMLImageElement | undefined = $state();
-	let snapshotSrc = $state<string | null>(null);
-	let isLoading = $state(false);
+	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let imageDims = $state<{
 		width: number;
@@ -34,31 +35,8 @@
 		naturalHeight: number;
 	} | null>(null);
 
-	async function fetchSnapshot() {
-		if (!url) return;
-		try {
-			isLoading = true;
-			error = null;
-
-			const res = await fetch('http://localhost:8000/api/cameras/preview', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url })
-			});
-
-			if (!res.ok) {
-				const data = await res.json();
-				throw new Error(data.detail || 'Failed to fetch snapshot');
-			}
-
-			const data = await res.json();
-			snapshotSrc = data.image;
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Snapshot failed';
-		} finally {
-			isLoading = false;
-		}
-	}
+	// MJPEG stream URL — the browser's <img> tag handles multipart/x-mixed-replace natively
+	const streamUrl = $derived(`http://localhost:8000/api/cameras/stream/${cameraId}`);
 
 	function updateDims() {
 		if (!imgRef || !containerRef) return;
@@ -89,9 +67,18 @@
 		};
 	}
 
-	onMount(() => {
-		fetchSnapshot();
+	function handleLoad() {
+		isLoading = false;
+		error = null;
+		updateDims();
+	}
 
+	function handleError() {
+		isLoading = false;
+		error = 'Could not connect to stream. Check the URL and backend.';
+	}
+
+	onMount(() => {
 		const observer = new ResizeObserver(updateDims);
 		if (containerRef) observer.observe(containerRef);
 
@@ -103,27 +90,29 @@
 	bind:this={containerRef}
 	class="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg bg-black"
 >
-	{#if isLoading}
-		<div class="animate-pulse text-sm text-muted-foreground">Fetching stream snapshot...</div>
-	{:else if error}
+	{#if error}
 		<div class="flex flex-col items-center gap-3 text-center">
 			<p class="text-sm text-red-500">{error}</p>
-			<button
-				class="cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-zinc-800"
-				onclick={fetchSnapshot}
-			>
-				Retry
-			</button>
+			<p class="max-w-[300px] text-xs break-all text-muted-foreground">{url}</p>
 		</div>
-	{:else if snapshotSrc}
+	{:else}
+		{#if isLoading}
+			<div class="absolute z-20 animate-pulse text-sm text-muted-foreground">
+				Connecting to live stream...
+			</div>
+		{/if}
+
+		<!-- MJPEG live stream: the browser natively handles multipart/x-mixed-replace as a live updating image -->
 		<img
 			bind:this={imgRef}
-			src={snapshotSrc}
-			alt="RTSP snapshot"
+			src={streamUrl}
+			alt="Live RTSP stream"
 			class="pointer-events-none max-h-full max-w-full object-contain"
-			onload={updateDims}
+			onload={handleLoad}
+			onerror={handleError}
 		/>
 
+		<!-- Drawing Canvas Overlay -->
 		{#if imageDims}
 			<div
 				class="absolute z-10 flex items-center justify-center"
@@ -143,15 +132,5 @@
 				/>
 			</div>
 		{/if}
-
-		<!-- Refresh button -->
-		<button
-			class="absolute right-2 bottom-2 z-20 cursor-pointer rounded-md bg-black/60 px-2.5 py-1.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/80"
-			onclick={fetchSnapshot}
-		>
-			↻ Refresh
-		</button>
-	{:else}
-		<div class="text-sm text-muted-foreground">No stream URL provided</div>
 	{/if}
 </div>

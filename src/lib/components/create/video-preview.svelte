@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 
 	interface Props {
+		cameraId?: string;
 		zones: Zone[];
 		selectedZoneId: string | null;
 		drawingMode: 'polygon' | 'line';
@@ -13,8 +14,15 @@
 		onZoneUpdated: (id: string, newPoints: Point[]) => void;
 	}
 
-	let { zones, selectedZoneId, drawingMode, onZoneCreated, onZoneSelected, onZoneUpdated }: Props =
-		$props();
+	let {
+		cameraId = '',
+		zones,
+		selectedZoneId,
+		drawingMode,
+		onZoneCreated,
+		onZoneSelected,
+		onZoneUpdated
+	}: Props = $props();
 
 	const videoState = useVideo();
 
@@ -104,6 +112,7 @@
 {#if videoState?.videoType === 'rtsp'}
 	<RtspSnapshotPreview
 		url={videoState.videoConfig?.url || videoState.videoUrl || ''}
+		{cameraId}
 		{zones}
 		{selectedZoneId}
 		{drawingMode}
