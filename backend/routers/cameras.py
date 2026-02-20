@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from typing import List, Dict
 
 from database import get_db
-from models import Camera, CameraCreate
+from models import Camera, CameraCreate, CameraUpdate
 
 router = APIRouter(
     prefix="/api/cameras",
@@ -65,19 +65,29 @@ async def create_camera(camera: CameraCreate):
 
 
 @router.put("/{camera_id}")
-async def update_camera(camera_id: str, camera: CameraCreate):
+async def update_camera(camera_id: str, camera_update: CameraUpdate):
     """
     Update an existing camera's zones, model, or stream configuration.
     Usually called right before switching to the Livestream page.
     """
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT id FROM cameras WHERE id = ?", (camera_id,))
-        if not await cursor.fetchone():
+        cursor = await db.execute("SELECT * FROM cameras WHERE id = ?", (camera_id,))
+        row = await cursor.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Camera not found")
 
-        zones_json = json.dumps(camera.zones) if camera.zones is not None else "[]"
-        classes_json = json.dumps(camera.classes) if camera.classes is not None else "[]"
+        # Merge updates with existing DB row
+        existing = dict(row)
+        
+        name = camera_update.name if camera_update.name is not None else existing['name']
+        type_str = camera_update.type if camera_update.type is not None else existing['type']
+        url = camera_update.url if camera_update.url is not None else existing['url']
+        device_id = camera_update.device_id if camera_update.device_id is not None else existing['device_id']
+        model_name = camera_update.model_name if camera_update.model_name is not None else existing['model_name']
+        
+        zones_json = json.dumps(camera_update.zones) if camera_update.zones is not None else existing['zones']
+        classes_json = json.dumps(camera_update.classes) if camera_update.classes is not None else existing['classes']
 
         await db.execute(
             """
@@ -86,12 +96,12 @@ async def update_camera(camera_id: str, camera: CameraCreate):
             WHERE id = ?
             """,
             (
-                camera.name,
-                camera.type,
-                camera.url,
-                camera.device_id,
+                name,
+                type_str,
+                url,
+                device_id,
                 zones_json,
-                camera.model_name or "yolo11n",
+                model_name,
                 classes_json,
                 camera_id
             )
@@ -157,18 +167,22 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
     
     active_connections[camera_id].append(websocket)
     
+    # As soon as the first client connects, spawn the heavy YOLO camera worker thread
+    if len(active_connections[camera_id]) == 1:
+        from services.camera_worker import camera_manager
+        camera_manager.spawn_worker(camera_id)
+
     try:
-        # TODO: A separate Python background worker should be pulling RTSP frames,
-        # running YOLO, and pushing messages into a queue. For now, we accept messages
-        # from the client or ping them to keep the connection alive.
+        # We just wait for messages from the browser or standard health pings
         while True:
-            # We just wait for messages from the browser or standard health pings
             data = await websocket.receive_text()
-            
-            # If the backend worker had a result, it would broadcast here:
-            # await websocket.send_json({"boxes": [...], "zones": [...]})
+            # If the client sends updated zones, we could parse them here.
+            # But normally PUT handles that, and the worker reloads from DB.
     except WebSocketDisconnect:
         active_connections[camera_id].remove(websocket)
         if not active_connections[camera_id]:
             del active_connections[camera_id]
+            # Kill the worker to save CPU when no one is watching
+            from services.camera_worker import camera_manager
+            camera_manager.kill_worker(camera_id)
 

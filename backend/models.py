@@ -155,6 +155,16 @@ class CameraCreate(BaseModel):
     classes: list | None = None
 
 
+class CameraUpdate(BaseModel):
+    name: str | None = None
+    type: str | None = None
+    url: str | None = None
+    device_id: str | None = None
+    zones: list | None = None
+    model_name: str | None = None
+    classes: list | None = None
+
+
 class Camera(BaseModel):
     id: str
     name: str

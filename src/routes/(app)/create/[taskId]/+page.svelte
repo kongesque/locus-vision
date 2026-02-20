@@ -99,9 +99,6 @@
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						name: 'Updated Camera', // We'd ideally pull the original name from the store, but this suffices for now
-						type: videoStore.videoType,
-						url: videoStore.videoUrl,
 						zones: zones,
 						model_name: selectedModel,
 						classes: fullFrameClasses

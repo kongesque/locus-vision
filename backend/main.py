@@ -12,11 +12,21 @@ from routers.video_processing import router as video_router
 from routers.cameras import router as cameras_router
 
 
+import asyncio
+from services.camera_worker import camera_manager
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
+    """Initialize database and async workers on startup."""
     await init_db()
+    
+    # Give the thread manager access to the core FastAPI event loop
+    camera_manager.initialize(asyncio.get_running_loop())
+    
     yield
+    
+    # Cleanup background workers on shutdown
+    camera_manager.shutdown_all()
 
 
 app = FastAPI(
