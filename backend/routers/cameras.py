@@ -413,24 +413,19 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
     cam_type = row["type"] if row else "webcam"
     model_name = row["model_name"] if row else "yolo11n"
 
-    # For RTSP, spin up the background thread
-    if cam_type == "rtsp":
-        from services.camera_worker import camera_manager
-        camera_manager.spawn_rtsp_worker(camera_id)
+    # We no longer spawn a background worker for RTSP because grabbing frames 
+    # out-of-sync with the HLS manifest playing in the browser caused the bounding
+    # boxes to be misaligned with the video.
+    # Instead, BOTH webcam and RTSP/HLS streams now send their visible frames 
+    # to this websocket directly from the browser's <video> element.
 
     try:
         while True:
-            if cam_type == "webcam":
-                # Browser sends binary JPEG frames
-                data = await websocket.receive_bytes()
-                from services.camera_worker import process_frame_bytes
-                result = process_frame_bytes(data, model_name)
-                await websocket.send_json(result)
-            else:
-                # RTSP: the background thread pushes messages; we just keep alive
-                _msg = await websocket.receive()
-                if _msg.get("type") == "websocket.disconnect":
-                    break
+            # Client sends binary JPEG frames
+            data = await websocket.receive_bytes()
+            from services.camera_worker import process_frame_bytes
+            result = process_frame_bytes(data, model_name)
+            await websocket.send_json(result)
     except WebSocketDisconnect:
         pass
     finally:
@@ -438,7 +433,4 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
             active_connections[camera_id].remove(websocket)
         if not active_connections.get(camera_id):
             active_connections.pop(camera_id, None)
-            if cam_type == "rtsp":
-                from services.camera_worker import camera_manager
-                camera_manager.kill_worker(camera_id)
 

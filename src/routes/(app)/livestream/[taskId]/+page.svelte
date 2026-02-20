@@ -155,9 +155,9 @@
 			}
 
 			captureInterval = setInterval(() => {
-				// Only send frames if this is currently a webcam camera
-				if (cameraType !== 'webcam') return;
-
+				// We now send frames for BOTH webcam and RTSP/HLS.
+				// Since HLS plays in the <video> tag via proxy, capturing frames here
+				// guarantees perfect synchronization between the visible video and YOLO results.
 				if (!videoEl || videoEl.readyState < 2 || ws.readyState !== WebSocket.OPEN) return;
 
 				captureCanvas.width = videoEl.videoWidth || 640;
@@ -289,7 +289,13 @@
 				<AspectRatio ratio={16 / 9} class="group relative max-h-[80vh]">
 					<!-- Single <video> element for both webcam and RTSP/HLS -->
 					<!-- svelte-ignore a11y_media_has_caption -->
-					<video use:videoAction class="h-full w-full object-contain" autoplay playsinline muted
+					<video
+						use:videoAction
+						class="h-full w-full object-contain"
+						autoplay
+						playsinline
+						muted
+						crossorigin="anonymous"
 					></video>
 
 					<canvas use:overlayAction class="pointer-events-none absolute top-0 left-0 h-full w-full"
