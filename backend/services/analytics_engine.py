@@ -140,28 +140,49 @@ class AnalyticsEngine:
 
     def draw_annotations(self, frame: np.ndarray, result: AnalyticsResult):
         """
-        Draw bounding boxes, zones, and count overlay on a frame.
-        Used by the video processing pipeline (not livestream — that draws on canvas).
+        Draw bounding boxes, labels, zones, and count overlay on a frame.
+        Matches the same visual style as the livestream canvas overlay.
         """
-        # Draw zones
+        # Draw zone polygons (dashed-style via polylines)
         for zone in self.parsed_zones:
-            cv2.polylines(frame, [zone.poly], True, zone.color, 3)
+            cv2.polylines(frame, [zone.poly], True, zone.color, 2)
+            # Semi-transparent fill
+            overlay = frame.copy()
+            cv2.fillPoly(overlay, [zone.poly], zone.color)
+            cv2.addWeighted(overlay, 0.1, frame, 0.9, 0, frame)
 
-        # Draw boxes
+        # Draw bounding boxes with labels
         for box in result.boxes:
-            center = (int(box["x"] + box["w"] / 2), int(box["y"] + box["h"] / 2))
+            x1 = int(box["x"])
+            y1 = int(box["y"])
+            x2 = int(box["x"] + box["w"])
+            y2 = int(box["y"] + box["h"])
             track_id = box["id"]
 
+            # Color: orange if currently in zone, green if already counted, red otherwise
             if box["in_zone"]:
-                cv2.circle(frame, center, 9, (244, 133, 66), -1)   # Orange = in zone
+                color = (0, 140, 255)    # Orange (BGR)
             elif track_id in self.crossed_objects:
-                cv2.circle(frame, center, 9, (83, 168, 51), -1)    # Green = already counted
+                color = (0, 200, 0)      # Green
             else:
-                cv2.circle(frame, center, 9, (54, 67, 234), -1)    # Red = not counted
+                color = (0, 0, 255)      # Red
 
-        # Draw count
+            # Bounding box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            # Label background + text
+            label = f"{box['label']} #{track_id}"
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(frame, (x1, y1 - th - 8), (x1 + tw + 8, y1), color, -1)
+            cv2.putText(frame, label, (x1 + 4, y1 - 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
+        # Count overlay (top-left)
         count_text = f"Count: {result.total_count}"
-        cv2.putText(frame, count_text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+        cv2.putText(frame, count_text, (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 4, cv2.LINE_AA)
+        cv2.putText(frame, count_text, (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2, cv2.LINE_AA)
 
     # ── Private helpers ──────────────────────────────────────────
 

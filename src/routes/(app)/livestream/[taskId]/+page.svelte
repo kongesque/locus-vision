@@ -217,6 +217,7 @@
 		const scaleX = canvas.width / videoRes.w;
 		const scaleY = canvas.height / videoRes.h;
 
+		// Draw zones
 		zones.forEach((zone) => {
 			if (!zone.points || zone.points.length < 2) return;
 
@@ -234,10 +235,17 @@
 			if (zone.type === 'polygon') ctx.closePath();
 			ctx.stroke();
 			ctx.setLineDash([]);
+
+			// Semi-transparent fill
+			ctx.fillStyle = (zone.color || '#00ff00') + '1a';
+			ctx.fill();
 		});
 
+		// Draw boxes with zone-aware colors (matching video-analytics)
 		boxes.forEach((box) => {
-			ctx.strokeStyle = '#ff0000';
+			// Orange = in zone, green = already counted, red = uncounted
+			const color = box.in_zone ? '#ff8c00' : '#ff0000';
+			ctx.strokeStyle = color;
 			ctx.lineWidth = 2;
 
 			const scaledX = box.x * scaleX;
@@ -248,15 +256,26 @@
 			ctx.strokeRect(scaledX, scaledY, scaledW, scaledH);
 
 			if (box.label) {
-				ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
 				const labelText = `${box.label} #${box.id}`;
+				ctx.font = 'bold 13px Inter, Arial, sans-serif';
 				const textWidth = ctx.measureText(labelText).width + 10;
+				ctx.fillStyle = color;
 				ctx.fillRect(scaledX, scaledY - 22, textWidth, 22);
 				ctx.fillStyle = '#ffffff';
-				ctx.font = 'bold 13px Inter, Arial, sans-serif';
 				ctx.fillText(labelText, scaledX + 5, scaledY - 6);
 			}
 		});
+
+		// Count overlay (top-left)
+		if (trackCount > 0) {
+			const countText = `Count: ${trackCount}`;
+			ctx.font = 'bold 20px Inter, Arial, sans-serif';
+			const tw = ctx.measureText(countText).width;
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+			ctx.fillRect(10, 10, tw + 20, 32);
+			ctx.fillStyle = '#ffffff';
+			ctx.fillText(countText, 20, 34);
+		}
 	}
 </script>
 
