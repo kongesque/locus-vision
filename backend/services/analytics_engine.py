@@ -27,6 +27,7 @@ class ParsedZone:
     color: tuple
     zone_id: str
     classes: list  # List of class IDs to filter (empty = all)
+    zone_type: str = "polygon"  # 'polygon' or 'line'
 
 
 class AnalyticsEngine:
@@ -38,6 +39,16 @@ class AnalyticsEngine:
     - Crossed objects (unique IDs that entered any zone)
     - Per-zone class filtering
     """
+
+    @staticmethod
+    def _ccw(A, B, C):
+        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+    @staticmethod
+    def _segments_intersect(A, B, C, D) -> bool:
+        """Return True if line segment AB intersects CD."""
+        return AnalyticsEngine._ccw(A, C, D) != AnalyticsEngine._ccw(B, C, D) and \
+               AnalyticsEngine._ccw(A, B, C) != AnalyticsEngine._ccw(A, B, D)
 
     def __init__(self, model_name: str = "yolo11n", zones: list = None, full_frame_classes: list = None):
         self.detector: OnnxDetector = get_detector(model_name)
@@ -56,14 +67,21 @@ class AnalyticsEngine:
         self.parsed_zones = []
         for zone in zones:
             points = zone.get("points", [])
-            if len(points) < 3:
+            if len(points) < 2:
                 continue
             pts = np.array([[p['x'], p['y']] for p in points], np.int32)
+            
+            # Require at least 3 points for a polygon, 2 for a line
+            z_type = zone.get("type", "polygon")
+            if z_type == "polygon" and len(pts) < 3:
+                continue
+                
             self.parsed_zones.append(ParsedZone(
                 poly=pts,
                 color=self._parse_color(zone.get("color", "#00ff00")),
                 zone_id=zone.get("id", ""),
-                classes=self._get_class_ids(zone.get("classes", []))
+                classes=self._get_class_ids(zone.get("classes", [])),
+                zone_type=z_type
             ))
 
     def reset(self):
@@ -108,12 +126,25 @@ class AnalyticsEngine:
                         # Class filter: if zone specifies classes, skip non-matching
                         if zone.classes and cls_idx not in zone.classes:
                             continue
-                        dist = cv2.pointPolygonTest(zone.poly, center, False)
-                        if dist >= 0:
-                            in_zone = True
-                            if track_id not in self.crossed_objects:
-                                self.crossed_objects[track_id] = True
-                            break
+                        
+                        if zone.zone_type == "polygon":
+                            dist = cv2.pointPolygonTest(zone.poly, center, False)
+                            if dist >= 0:
+                                in_zone = True
+                                if track_id not in self.crossed_objects:
+                                    self.crossed_objects[track_id] = True
+                                break
+                        elif zone.zone_type == "line":
+                            if len(zone.poly) >= 2 and len(track) >= 2:
+                                p1 = track[-2]
+                                p2 = track[-1]
+                                line_start = tuple(zone.poly[0])
+                                line_end = tuple(zone.poly[-1])
+                                if AnalyticsEngine._segments_intersect(p1, p2, line_start, line_end):
+                                    in_zone = True
+                                    if track_id not in self.crossed_objects:
+                                        self.crossed_objects[track_id] = True
+                                    break
                 else:
                     # No zones defined — count everything matching full-frame filter
                     if not self.full_frame_class_ids or cls_idx in self.full_frame_class_ids:
@@ -144,19 +175,24 @@ class AnalyticsEngine:
         Draw bounding boxes, labels, zones, and count overlay on a frame.
         Matches the same visual style as the livestream canvas overlay.
         """
-        # Draw zone polygons (dashed-style)
+        # Draw zone polygons and lines (dashed-style)
         for zone in self.parsed_zones:
-            # Semi-transparent fill
-            overlay = frame.copy()
-            cv2.fillPoly(overlay, [zone.poly], zone.color)
-            cv2.addWeighted(overlay, 0.1, frame, 0.9, 0, frame)
+            if zone.zone_type == "polygon":
+                # Semi-transparent fill
+                overlay = frame.copy()
+                cv2.fillPoly(overlay, [zone.poly], zone.color)
+                cv2.addWeighted(overlay, 0.1, frame, 0.9, 0, frame)
 
             # Draw dashed borders
             dash_length = 10
             gap_length = 5
             pts = zone.poly
             num_pts = len(pts)
-            for i in range(num_pts):
+            
+            # Polygons close the shape (num_pts), lines do not (num_pts - 1)
+            segments = num_pts if zone.zone_type == "polygon" else num_pts - 1
+            
+            for i in range(segments):
                 pt1 = tuple(pts[i])
                 pt2 = tuple(pts[(i + 1) % num_pts])
                 
