@@ -109,7 +109,7 @@ class OnnxDetector:
     Loads a YOLO ONNX model and runs detection + optional ByteTrack tracking.
     """
 
-    def __init__(self, model_path: str, conf_threshold: float = 0.25, iou_threshold: float = 0.45):
+    def __init__(self, model_path: str, conf_threshold: float = 0.15, iou_threshold: float = 0.45):
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.names = _load_class_names()
