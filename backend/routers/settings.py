@@ -183,6 +183,25 @@ async def revoke_sessions(current_user: dict = Depends(_require_user)):
         await db.close()
 
 
+@router.delete("/api/settings/account", response_model=MessageResponse)
+async def delete_own_account(current_user: dict = Depends(_require_user)):
+    """Delete own account and all sessions."""
+    db = await get_db()
+    try:
+        # Check if user exists 
+        cursor = await db.execute("SELECT id FROM users WHERE id = ?", (current_user["id"],))
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Delete user (sessions will be deleted via ON DELETE CASCADE in SQLite, but we can do it explicitly anyway)
+        await db.execute("DELETE FROM sessions WHERE user_id = ?", (current_user["id"],))
+        await db.execute("DELETE FROM users WHERE id = ?", (current_user["id"],))
+        await db.commit()
+        return MessageResponse(message="Account deleted successfully")
+    finally:
+        await db.close()
+
+
 # ══════════════════════════════════════════════════════════
 # ADMIN: USER MANAGEMENT
 # ══════════════════════════════════════════════════════════

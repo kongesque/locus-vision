@@ -20,6 +20,9 @@
 
 	// Delete all media confirmation
 	let deleteAllMediaDialog = $state(false);
+
+	// Delete own account confirmation
+	let deleteAccountDialog = $state(false);
 </script>
 
 <svelte:head>
@@ -74,12 +77,36 @@
 					<p class="text-sm text-green-600">Account updated successfully</p>
 				{/if}
 
-				<div class="flex justify-end">
+				<div class="flex justify-end pt-4">
 					<Button type="submit" disabled={loading === 'account'}>
 						{loading === 'account' ? 'Saving…' : 'Save Changes'}
 					</Button>
 				</div>
 			</form>
+
+			<div
+				class="mt-6 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"
+			>
+				<div class="space-y-0.5">
+					<Label class="text-sm font-medium">Account Actions</Label>
+					<p class="text-xs text-muted-foreground">
+						Log out of your account or permanently delete it.
+					</p>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<form method="POST" action="/logout">
+						<Button type="submit" variant="outline" size="sm">Log Out</Button>
+					</form>
+					<Button
+						type="button"
+						variant="destructive"
+						size="sm"
+						onclick={() => (deleteAccountDialog = true)}
+					>
+						Delete Account
+					</Button>
+				</div>
+			</div>
 		</Card.Content>
 	</Card.Root>
 
@@ -427,6 +454,32 @@
 			<form method="POST" action="?/deleteAllMedia" use:enhance class="inline">
 				<Button type="submit" variant="destructive" onclick={() => (deleteAllMediaDialog = false)}
 					>Delete All</Button
+				>
+			</form>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- Delete Own Account Confirmation Dialog -->
+<AlertDialog.Root
+	open={deleteAccountDialog}
+	onOpenChange={(open) => {
+		if (!open) deleteAccountDialog = false;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Account</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete your account? This action cannot be undone and you will lose
+				access immediately.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => (deleteAccountDialog = false)}>Cancel</AlertDialog.Cancel>
+			<form method="POST" action="?/deleteAccount" use:enhance class="inline">
+				<Button type="submit" variant="destructive" onclick={() => (deleteAccountDialog = false)}
+					>Delete My Account</Button
 				>
 			</form>
 		</AlertDialog.Footer>

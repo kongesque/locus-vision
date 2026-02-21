@@ -210,5 +210,24 @@ export const actions: Actions = {
         }
 
         return { adminSuccess: true, message: 'All media and stream configurations deleted successfully' };
+    },
+
+    deleteAccount: async ({ cookies }) => {
+        const accessToken = cookies.get('access_token');
+
+        const res = await fetch(`${API_BASE}/api/settings/account`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            return fail(res.status, { accountError: err.detail || 'Failed to delete account' });
+        }
+
+        // Account deleted successfully, now logout the user
+        cookies.delete('access_token', { path: '/' });
+        cookies.delete('refresh_token', { path: '/' });
+        throw redirect(303, '/login');
     }
 };
