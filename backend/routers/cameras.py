@@ -411,11 +411,9 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
     """
     WebSocket endpoint for real-time YOLO analytics.
 
-    For webcam cameras: the browser sends JPEG frames (as binary), we run YOLO
-    and send back bounding-box JSON.
-
-    For RTSP cameras: we spawn a background thread that reads the RTSP stream
-    and pushes results into this WebSocket.
+    Both webcam and RTSP/HLS streams send their visible frames
+    to this websocket directly from the browser's <video> element.
+    Uses the shared AnalyticsEngine for zone-aware counting.
     """
     await websocket.accept()
 
@@ -423,29 +421,26 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
         active_connections[camera_id] = []
     active_connections[camera_id].append(websocket)
 
-    # Look up the camera type from DB
+    # Look up camera config (type, model, zones) from DB
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT type, model_name FROM cameras WHERE id = ?", (camera_id,))
+        cursor = await db.execute("SELECT type, model_name, zones FROM cameras WHERE id = ?", (camera_id,))
         row = await cursor.fetchone()
     finally:
         await db.close()
 
-    cam_type = row["type"] if row else "webcam"
     model_name = row["model_name"] if row else "yolo11n"
-
-    # We no longer spawn a background worker for RTSP because grabbing frames 
-    # out-of-sync with the HLS manifest playing in the browser caused the bounding
-    # boxes to be misaligned with the video.
-    # Instead, BOTH webcam and RTSP/HLS streams now send their visible frames 
-    # to this websocket directly from the browser's <video> element.
+    
+    # Parse zones from DB
+    raw_zones = row["zones"] if row else "[]"
+    zones = json.loads(raw_zones) if isinstance(raw_zones, str) else (raw_zones or [])
 
     try:
         while True:
             # Client sends binary JPEG frames
             data = await websocket.receive_bytes()
             from services.camera_worker import process_frame_bytes
-            result = process_frame_bytes(data, model_name)
+            result = process_frame_bytes(data, camera_id, model_name, zones)
             await websocket.send_json(result)
     except WebSocketDisconnect:
         pass

@@ -4,6 +4,8 @@ Camera analytics worker.
 Two modes:
 1. RTSP mode  – A background thread pulls frames via OpenCV and broadcasts YOLO results.
 2. Webcam mode – The browser sends JPEG frames over the WebSocket and we process them inline.
+
+Both modes now use the shared AnalyticsEngine for zone-aware counting.
 """
 import asyncio
 import threading
@@ -13,23 +15,42 @@ import time
 import sqlite3
 import os
 import numpy as np
-from services.onnx_detector import get_detector
+from services.analytics_engine import AnalyticsEngine
 
 from routers.cameras import active_connections
 from config import settings
 
-# ── Shared detector cache (handled by onnx_detector.get_detector) ──
 MODELS_DIR = "data/models"
 os.makedirs(MODELS_DIR, exist_ok=True)
+
+# Per-camera analytics engine instances (keyed by camera_id)
+_camera_engines: dict[str, AnalyticsEngine] = {}
+
+
+def get_camera_engine(camera_id: str, model_name: str = "yolo11n", zones: list = None) -> AnalyticsEngine:
+    """Get or create an AnalyticsEngine for a specific camera."""
+    if camera_id not in _camera_engines:
+        _camera_engines[camera_id] = AnalyticsEngine(
+            model_name=model_name,
+            zones=zones,
+        )
+    return _camera_engines[camera_id]
+
+
+def update_camera_engine(camera_id: str, zones: list = None):
+    """Update zones on an existing camera engine."""
+    if camera_id in _camera_engines and zones is not None:
+        _camera_engines[camera_id].set_zones(zones)
 
 
 # ── Webcam "inline" processor (runs per-frame, called from the WS handler) ──
 
-def process_frame_bytes(jpeg_bytes: bytes, model_name: str = "yolo11n") -> dict:
+def process_frame_bytes(jpeg_bytes: bytes, camera_id: str, model_name: str = "yolo11n", zones: list = None) -> dict:
     """
-    Decode a JPEG frame, run YOLO tracking, return a dict ready to be sent as JSON.
+    Decode a JPEG frame, run YOLO tracking with zone-aware counting,
+    return a dict ready to be sent as JSON via WebSocket.
     """
-    detector = get_detector(model_name)
+    engine = get_camera_engine(camera_id, model_name, zones)
 
     # Decode JPEG → OpenCV BGR
     arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
@@ -37,35 +58,17 @@ def process_frame_bytes(jpeg_bytes: bytes, model_name: str = "yolo11n") -> dict:
     if frame is None:
         return {"event": "error", "message": "Bad frame"}
 
-    h, w = frame.shape[:2]
-
-    result = detector.track(frame)
-
-    boxes_data = []
-    if result.has_detections and result.track_ids:
-        for i, (box, tid, cls_idx, conf) in enumerate(
-            zip(result.boxes_xywh, result.track_ids, result.class_ids, result.scores)
-        ):
-            cx, cy, bw, bh = box
-            boxes_data.append({
-                "id": int(tid),
-                "x": float(cx - bw / 2),
-                "y": float(cy - bh / 2),
-                "w": float(bw),
-                "h": float(bh),
-                "class": int(cls_idx),
-                "conf": round(float(conf), 2),
-                "label": detector.names.get(int(cls_idx), f"class_{int(cls_idx)}"),
-            })
+    result = engine.process_frame(frame)
 
     return {
         "event": "analytics",
-        "resolution": {"w": w, "h": h},
-        "boxes": boxes_data,
+        "resolution": result.resolution,
+        "boxes": result.boxes,
+        "count": result.total_count,
     }
 
 
-# ── RTSP background thread worker (unchanged concept) ──────────
+# ── RTSP background thread worker ──────────────────────────────
 
 def _dict_factory(cursor, row):
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
@@ -73,8 +76,8 @@ def _dict_factory(cursor, row):
 
 class RtspWorker:
     """
-    A background thread that reads from an RTSP URL, runs YOLO, and pushes
-    results into the WebSocket connections registry.
+    A background thread that reads from an RTSP URL, runs YOLO with
+    zone-aware counting, and pushes results via WebSocket.
     """
     def __init__(self, camera_id: str, loop: asyncio.AbstractEventLoop):
         self.camera_id = camera_id
@@ -128,7 +131,12 @@ class RtspWorker:
             self.is_running = False
             return
 
-        detector = get_detector(cam.get("model_name", "yolo11n"))
+        # Parse zones from DB
+        zones = json.loads(cam.get("zones", "[]")) if isinstance(cam.get("zones"), str) else cam.get("zones", [])
+        model_name = cam.get("model_name", "yolo11n")
+
+        engine = get_camera_engine(self.camera_id, model_name, zones)
+
         cap = cv2.VideoCapture(cam["url"])
         if not cap.isOpened():
             print(f"[RTSP-{self.camera_id}] Cannot open stream: {cam['url']}")
@@ -150,30 +158,13 @@ class RtspWorker:
                 time.sleep(0.5)
                 continue
 
-            h, w = frame.shape[:2]
-            result = detector.track(frame)
-
-            boxes_data = []
-            if result.has_detections and result.track_ids:
-                for i, (box, tid, cls_idx, conf) in enumerate(
-                    zip(result.boxes_xywh, result.track_ids, result.class_ids, result.scores)
-                ):
-                    cx, cy, bw, bh = box
-                    boxes_data.append({
-                        "id": int(tid),
-                        "x": float(cx - bw / 2),
-                        "y": float(cy - bh / 2),
-                        "w": float(bw),
-                        "h": float(bh),
-                        "class": int(cls_idx),
-                        "conf": round(float(conf), 2),
-                        "label": detector.names.get(int(cls_idx), f"class_{int(cls_idx)}"),
-                    })
+            result = engine.process_frame(frame)
 
             payload = json.dumps({
                 "event": "analytics",
-                "resolution": {"w": w, "h": h},
-                "boxes": boxes_data,
+                "resolution": result.resolution,
+                "boxes": result.boxes,
+                "count": result.total_count,
             })
             self._broadcast(payload)
 

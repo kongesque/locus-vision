@@ -183,7 +183,10 @@
 				if (data.resolution) videoRes = data.resolution;
 				if (data.boxes) {
 					drawOverlay(node, data.boxes, videoRes);
-					trackCount = data.boxes.length;
+				}
+				// Use the backend's zone-aware unique count
+				if (data.count !== undefined) {
+					trackCount = data.count;
 				}
 			} catch (e) {
 				console.error('WS parse error', e);
