@@ -23,7 +23,18 @@
 	import { Input } from '$lib/components/ui/input';
 
 	// Icons
-	import { Trash2, Slash, Square, X, Info, Check, ChevronsUpDown } from '@lucide/svelte';
+	import {
+		Trash2,
+		Slash,
+		Square,
+		X,
+		Info,
+		Check,
+		ChevronsUpDown,
+		ArrowUpDown,
+		ArrowDown,
+		ArrowUp
+	} from '@lucide/svelte';
 
 	import { cn } from '$lib/utils';
 	import type { Zone } from './drawing-canvas.svelte';
@@ -42,6 +53,7 @@
 		onProcess: () => void;
 		onZoneRenamed: (id: string, name: string) => void;
 		onZoneClassesChanged: (id: string, classes: string[]) => void;
+		onZoneDirectionChanged: (id: string, direction: 'both' | 'in' | 'out') => void;
 		onFullFrameClassesChanged: (classes: string[]) => void;
 		onModelChange: (model: YoloModel) => void;
 	}
@@ -58,6 +70,7 @@
 		onProcess,
 		onZoneRenamed,
 		onZoneClassesChanged,
+		onZoneDirectionChanged,
 		onFullFrameClassesChanged,
 		onModelChange
 	}: Props = $props();
@@ -335,6 +348,48 @@
 																</Command.Root>
 															</Popover.Content>
 														</Popover.Root>
+
+														{#if zone.type === 'line'}
+															<div class="mt-2">
+																<span
+																	class="mb-1 block text-[11px] font-medium text-muted-foreground"
+																	>Crossing Direction</span
+																>
+																<ToggleGroup.Root
+																	type="single"
+																	value={zone.direction || 'both'}
+																	onValueChange={(v) =>
+																		v &&
+																		onZoneDirectionChanged(zone.id, v as 'both' | 'in' | 'out')}
+																	class="w-full justify-stretch"
+																>
+																	<ToggleGroup.Item
+																		value="both"
+																		aria-label="A ↔ B"
+																		class="flex-1 gap-1 font-mono text-[10px]"
+																	>
+																		<ArrowUpDown class="h-3 w-3" />
+																		A ↔ B
+																	</ToggleGroup.Item>
+																	<ToggleGroup.Item
+																		value="in"
+																		aria-label="A → B"
+																		class="flex-1 gap-1 font-mono text-[10px]"
+																	>
+																		<ArrowDown class="h-3 w-3" />
+																		A → B
+																	</ToggleGroup.Item>
+																	<ToggleGroup.Item
+																		value="out"
+																		aria-label="B → A"
+																		class="flex-1 gap-1 font-mono text-[10px]"
+																	>
+																		<ArrowUp class="h-3 w-3" />
+																		B → A
+																	</ToggleGroup.Item>
+																</ToggleGroup.Root>
+															</div>
+														{/if}
 													</div>
 												{/if}
 											</div>

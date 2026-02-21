@@ -28,6 +28,7 @@ class ParsedZone:
     zone_id: str
     classes: list  # List of class IDs to filter (empty = all)
     zone_type: str = "polygon"  # 'polygon' or 'line'
+    direction: str = "both"  # 'both', 'in', or 'out' (line zones only)
 
 
 class AnalyticsEngine:
@@ -49,6 +50,25 @@ class AnalyticsEngine:
         """Return True if line segment AB intersects CD."""
         return AnalyticsEngine._ccw(A, C, D) != AnalyticsEngine._ccw(B, C, D) and \
                AnalyticsEngine._ccw(A, B, C) != AnalyticsEngine._ccw(A, B, D)
+
+    @staticmethod
+    def _cross_sign(A, B, C, D) -> int:
+        """
+        Return the sign of the cross product of line CD with movement AB.
+        Positive = crossing from left to right ("in"), Negative = right to left ("out").
+        """
+        # Line direction vector
+        ldx = D[0] - C[0]
+        ldy = D[1] - C[1]
+        # Movement midpoint relative to line start
+        mid = ((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)
+        # Cross product: line_dir × (midpoint - line_start)
+        cross = ldx * (mid[1] - C[1]) - ldy * (mid[0] - C[0])
+        if cross > 0:
+            return 1   # "in"
+        elif cross < 0:
+            return -1  # "out"
+        return 0
 
     def __init__(self, model_name: str = "yolo11n", zones: list = None, full_frame_classes: list = None):
         self.detector: OnnxDetector = get_detector(model_name)
@@ -81,7 +101,8 @@ class AnalyticsEngine:
                 color=self._parse_color(zone.get("color", "#00ff00")),
                 zone_id=zone.get("id", ""),
                 classes=self._get_class_ids(zone.get("classes", [])),
-                zone_type=z_type
+                zone_type=z_type,
+                direction=zone.get("direction", "both")
             ))
 
     def reset(self):
@@ -141,10 +162,20 @@ class AnalyticsEngine:
                                 line_start = tuple(zone.poly[0])
                                 line_end = tuple(zone.poly[-1])
                                 if AnalyticsEngine._segments_intersect(p1, p2, line_start, line_end):
-                                    in_zone = True
-                                    if track_id not in self.crossed_objects:
-                                        self.crossed_objects[track_id] = True
-                                    break
+                                    # Check crossing direction
+                                    if zone.direction == "both":
+                                        direction_ok = True
+                                    else:
+                                        sign = AnalyticsEngine._cross_sign(p1, p2, line_start, line_end)
+                                        direction_ok = (
+                                            (zone.direction == "in" and sign > 0) or
+                                            (zone.direction == "out" and sign < 0)
+                                        )
+                                    if direction_ok:
+                                        in_zone = True
+                                        if track_id not in self.crossed_objects:
+                                            self.crossed_objects[track_id] = True
+                                        break
                 else:
                     # No zones defined — count everything matching full-frame filter
                     if not self.full_frame_class_ids or cls_idx in self.full_frame_class_ids:

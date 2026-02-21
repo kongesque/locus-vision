@@ -35,7 +35,8 @@
 			type: drawingMode,
 			name: `${drawingMode === 'line' ? 'Line' : 'Zone'} ${zones.length + 1}`,
 			classes: [], // Empty means detect all classes
-			color: '#fbbd05'
+			color: '#fbbd05',
+			direction: 'both'
 		};
 		zones = [...zones, newZone];
 		selectedZoneId = newZone.id; // Auto-select new zone
@@ -47,6 +48,10 @@
 
 	function handleZoneClassesChanged(id: string, classes: string[]) {
 		zones = zones.map((z) => (z.id === id ? { ...z, classes: classes } : z));
+	}
+
+	function handleZoneDirectionChanged(id: string, direction: 'both' | 'in' | 'out') {
+		zones = zones.map((z) => (z.id === id ? { ...z, direction } : z));
 	}
 
 	function handleZoneSelected(id: string | null) {
@@ -151,6 +156,7 @@
 				onProcess={handleProcess}
 				onZoneRenamed={handleZoneRenamed}
 				onZoneClassesChanged={handleZoneClassesChanged}
+				onZoneDirectionChanged={handleZoneDirectionChanged}
 				onFullFrameClassesChanged={(classes) => (fullFrameClasses = classes)}
 				onModelChange={(model) => (selectedModel = model)}
 			/>

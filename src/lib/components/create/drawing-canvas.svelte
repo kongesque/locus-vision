@@ -11,6 +11,7 @@
 		name: string;
 		classes: string[]; // Selected COCO classes for detection
 		color?: string; // Optional color for future use
+		direction?: 'both' | 'in' | 'out'; // Crossing direction for line zones
 	}
 </script>
 
@@ -145,6 +146,61 @@
 				ctx.fill();
 			} else {
 				ctx.stroke();
+
+				// Draw A/B indicators for lines (only for the active selection to reduce clutter, or all if preferred. Let's do all for clarity)
+				if (zone.points.length >= 2) {
+					const p1 = zone.points[0];
+					const p2 = zone.points[zone.points.length - 1]; // Use first and last point for overall direction
+
+					// Calculate direction vector
+					const dx = p2.x - p1.x;
+					const dy = p2.y - p1.y;
+					const len = Math.sqrt(dx * dx + dy * dy);
+
+					if (len > 0) {
+						// Normalize direction vector
+						const nx = dx / len;
+						const ny = dy / len;
+
+						// Calculate normal vectors (perpendicular)
+						// Right side (B)
+						const normRx = -ny;
+						const normRy = nx;
+						// Left side (A)
+						const normLx = ny;
+						const normLy = -nx;
+
+						// Midpoint of the line
+						const midX = (p1.x + p2.x) / 2;
+						const midY = (p1.y + p2.y) / 2;
+
+						// Distance to place text away from the line
+						const offset = 20 * scale;
+
+						// Setup text styling
+						ctx.font = `bold ${16 * scale}px sans-serif`;
+						ctx.textAlign = 'center';
+						ctx.textBaseline = 'middle';
+
+						// Draw 'A' (Left side)
+						const ax = midX + normLx * offset;
+						const ay = midY + normLy * offset;
+						ctx.fillStyle = '#ffffff';
+						ctx.strokeStyle = '#000000';
+						ctx.lineWidth = 2 * scale;
+						ctx.strokeText('A', ax, ay);
+						ctx.fillText('A', ax, ay);
+
+						// Draw 'B' (Right side)
+						const bx = midX + normRx * offset;
+						const by = midY + normRy * offset;
+						ctx.fillStyle = '#ffffff';
+						ctx.strokeStyle = '#000000';
+						ctx.lineWidth = 2 * scale;
+						ctx.strokeText('B', bx, by);
+						ctx.fillText('B', bx, by);
+					}
+				}
 			}
 
 			// Draw vertices ONLY for selected zone
@@ -192,6 +248,38 @@
 					}
 				}
 				ctx.lineTo(targetX, targetY);
+
+				// Draw A/B for elastic line if in line mode
+				if (drawingMode === 'line' && currentPoints.length === 1) {
+					const p1 = currentPoints[0];
+					const dx = targetX - p1.x;
+					const dy = targetY - p1.y;
+					const len = Math.sqrt(dx * dx + dy * dy);
+
+					if (len > 0) {
+						const nx = dx / len;
+						const ny = dy / len;
+						const normRx = -ny,
+							normRy = nx;
+						const normLx = ny,
+							normLy = -nx;
+
+						const midX = (p1.x + targetX) / 2;
+						const midY = (p1.y + targetY) / 2;
+						const offset = 20 * scale;
+
+						ctx.font = `bold ${16 * scale}px sans-serif`;
+						ctx.textAlign = 'center';
+						ctx.textBaseline = 'middle';
+						ctx.lineWidth = 2 * scale;
+
+						ctx.strokeText('A', midX + normLx * offset, midY + normLy * offset);
+						ctx.fillText('A', midX + normLx * offset, midY + normLy * offset);
+
+						ctx.strokeText('B', midX + normRx * offset, midY + normRy * offset);
+						ctx.fillText('B', midX + normRx * offset, midY + normRy * offset);
+					}
+				}
 			}
 
 			ctx.stroke();
