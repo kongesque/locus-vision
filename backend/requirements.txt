@@ -1,7 +1,12 @@
 fastapi
 uvicorn
 python-multipart
-ultralytics
 supervision
 opencv-python-headless
 numpy
+onnxruntime
+httpx
+aiosqlite
+pydantic-settings
+argon2-cffi
+python-jose[cryptography]

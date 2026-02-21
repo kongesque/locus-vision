@@ -12,38 +12,15 @@ import json
 import time
 import sqlite3
 import os
-import base64
 import numpy as np
-from ultralytics import YOLO
+from services.onnx_detector import get_detector
 
 from routers.cameras import active_connections
 from config import settings
 
-# ── Shared YOLO model cache ─────────────────────────────────────
+# ── Shared detector cache (handled by onnx_detector.get_detector) ──
 MODELS_DIR = "data/models"
 os.makedirs(MODELS_DIR, exist_ok=True)
-
-_loaded_models = {}
-
-def get_yolo_model(model_name: str):
-    if model_name not in _loaded_models:
-        print(f"[CameraWorker] Loading model: {model_name}")
-        model_path = os.path.join(MODELS_DIR, f"{model_name}.pt")
-        try:
-            if os.path.exists(model_path):
-                _loaded_models[model_name] = YOLO(model_path)
-            else:
-                print(f"[CameraWorker] Downloading {model_name}...")
-                temp = YOLO(f"{model_name}.pt")
-                if os.path.exists(f"{model_name}.pt"):
-                    os.rename(f"{model_name}.pt", model_path)
-                    _loaded_models[model_name] = YOLO(model_path)
-                else:
-                    _loaded_models[model_name] = temp
-        except Exception as e:
-            print(f"[CameraWorker] Fallback to yolov8n: {e}")
-            _loaded_models[model_name] = YOLO("yolov8n.pt")
-    return _loaded_models[model_name]
 
 
 # ── Webcam "inline" processor (runs per-frame, called from the WS handler) ──
@@ -52,7 +29,7 @@ def process_frame_bytes(jpeg_bytes: bytes, model_name: str = "yolo11n") -> dict:
     """
     Decode a JPEG frame, run YOLO tracking, return a dict ready to be sent as JSON.
     """
-    model = get_yolo_model(model_name)
+    detector = get_detector(model_name)
 
     # Decode JPEG → OpenCV BGR
     arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
@@ -62,29 +39,24 @@ def process_frame_bytes(jpeg_bytes: bytes, model_name: str = "yolo11n") -> dict:
 
     h, w = frame.shape[:2]
 
-    results = model.track(frame, persist=True, verbose=False)
+    result = detector.track(frame)
 
     boxes_data = []
-    if results and results[0].boxes:
-        boxes = results[0].boxes.xywh.cpu().numpy()
-        class_indices = results[0].boxes.cls.cpu().numpy()
-        confs = results[0].boxes.conf.cpu().numpy()
-        track_ids = results[0].boxes.id
-
-        if track_ids is not None:
-            track_ids = track_ids.int().cpu().tolist()
-            for box, tid, cls, conf in zip(boxes, track_ids, class_indices, confs):
-                cx, cy, bw, bh = box
-                boxes_data.append({
-                    "id": int(tid),
-                    "x": float(cx - bw / 2),
-                    "y": float(cy - bh / 2),
-                    "w": float(bw),
-                    "h": float(bh),
-                    "class": int(cls),
-                    "conf": round(float(conf), 2),
-                    "label": model.names[int(cls)],
-                })
+    if result.has_detections and result.track_ids:
+        for i, (box, tid, cls_idx, conf) in enumerate(
+            zip(result.boxes_xywh, result.track_ids, result.class_ids, result.scores)
+        ):
+            cx, cy, bw, bh = box
+            boxes_data.append({
+                "id": int(tid),
+                "x": float(cx - bw / 2),
+                "y": float(cy - bh / 2),
+                "w": float(bw),
+                "h": float(bh),
+                "class": int(cls_idx),
+                "conf": round(float(conf), 2),
+                "label": detector.names.get(int(cls_idx), f"class_{int(cls_idx)}"),
+            })
 
     return {
         "event": "analytics",
@@ -156,7 +128,7 @@ class RtspWorker:
             self.is_running = False
             return
 
-        model = get_yolo_model(cam.get("model_name", "yolo11n"))
+        detector = get_detector(cam.get("model_name", "yolo11n"))
         cap = cv2.VideoCapture(cam["url"])
         if not cap.isOpened():
             print(f"[RTSP-{self.camera_id}] Cannot open stream: {cam['url']}")
@@ -179,28 +151,24 @@ class RtspWorker:
                 continue
 
             h, w = frame.shape[:2]
-            results = model.track(frame, persist=True, verbose=False)
+            result = detector.track(frame)
 
             boxes_data = []
-            if results and results[0].boxes:
-                boxes = results[0].boxes.xywh.cpu().numpy()
-                cls_arr = results[0].boxes.cls.cpu().numpy()
-                confs = results[0].boxes.conf.cpu().numpy()
-                tids = results[0].boxes.id
-                if tids is not None:
-                    tids = tids.int().cpu().tolist()
-                    for box, tid, cls, conf in zip(boxes, tids, cls_arr, confs):
-                        cx, cy, bw, bh = box
-                        boxes_data.append({
-                            "id": int(tid),
-                            "x": float(cx - bw / 2),
-                            "y": float(cy - bh / 2),
-                            "w": float(bw),
-                            "h": float(bh),
-                            "class": int(cls),
-                            "conf": round(float(conf), 2),
-                            "label": model.names[int(cls)],
-                        })
+            if result.has_detections and result.track_ids:
+                for i, (box, tid, cls_idx, conf) in enumerate(
+                    zip(result.boxes_xywh, result.track_ids, result.class_ids, result.scores)
+                ):
+                    cx, cy, bw, bh = box
+                    boxes_data.append({
+                        "id": int(tid),
+                        "x": float(cx - bw / 2),
+                        "y": float(cy - bh / 2),
+                        "w": float(bw),
+                        "h": float(bh),
+                        "class": int(cls_idx),
+                        "conf": round(float(conf), 2),
+                        "label": detector.names.get(int(cls_idx), f"class_{int(cls_idx)}"),
+                    })
 
             payload = json.dumps({
                 "event": "analytics",

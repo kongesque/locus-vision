@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Dict
 import json
 from collections import defaultdict
-from ultralytics import YOLO
+from services.onnx_detector import get_detector
 from database import get_db
 from models import VideoTask
 from datetime import datetime
@@ -24,17 +24,15 @@ MODELS_DIR = "data/models"
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-def get_class_ids(model, class_names: List[str]) -> List[int]:
+def get_class_ids(names: dict[int, str], class_names: List[str]) -> List[int]:
     """
-    Get class IDs from model definition based on class names.
+    Get class IDs from the COCO names map based on class names.
     """
     if not class_names:
         return []
         
-    # Invert model.names: {id: name} -> {name: id}
-    # Ensure names are lowercased for comparison if needed, or exact match
-    # class_names from frontend might be loose, but usually match model.names
-    name_to_id = {v: k for k, v in model.names.items()}
+    # Invert names: {id: name} -> {name: id}
+    name_to_id = {v: k for k, v in names.items()}
     
     ids = []
     for name in class_names:
@@ -42,34 +40,6 @@ def get_class_ids(model, class_names: List[str]) -> List[int]:
             ids.append(name_to_id[name])
     return ids
 
-# Cache models to avoid reloading
-loaded_models = {}
-
-def get_model(model_name: str):
-    if model_name not in loaded_models:
-        print(f"Loading model: {model_name}")
-        model_path = os.path.join(MODELS_DIR, f"{model_name}.pt")
-        
-        
-        try:
-             # Check if we have it in our models dir
-             if os.path.exists(model_path):
-                 loaded_models[model_name] = YOLO(model_path)
-             else:
-                 print(f"Model {model_name} not found in {MODELS_DIR}, downloading...")
-                 # YOLO downloads to CWD, move it to models dir
-                 temp_model = YOLO(f"{model_name}.pt") 
-                 if os.path.exists(f"{model_name}.pt"):
-                     os.rename(f"{model_name}.pt", model_path)
-                     loaded_models[model_name] = YOLO(model_path)
-                 else:
-                     loaded_models[model_name] = temp_model
-
-        except Exception as e:
-            print(f"Error loading {model_name}, falling back to yolov8n. Error: {e}")
-            loaded_models[model_name] = YOLO("yolov8n.pt")
-            
-    return loaded_models[model_name]
 
 async def process_video_task(
     input_path: str,
@@ -97,7 +67,9 @@ async def process_video_task(
         await db.close()
 
     try:
-        model = get_model(model_name)
+        detector = get_detector(model_name)
+        # Reset tracker state for this new video
+        detector.reset_tracker()
         
         cap = cv2.VideoCapture(input_path)
         if not cap.isOpened():
@@ -147,10 +119,10 @@ async def process_video_task(
                 "poly": pts,
                 "color": (0, 255, 0), # Default color
                 "id": zone.get("id"),
-                "classes": get_class_ids(model, zone.get("classes", []))
+                "classes": get_class_ids(detector.names, zone.get("classes", []))
             })
     
-        full_frame_class_ids = get_class_ids(model, full_frame_classes)
+        full_frame_class_ids = get_class_ids(detector.names, full_frame_classes)
 
         frame_count = 0
         start_time = time.time()
@@ -164,10 +136,7 @@ async def process_video_task(
             if frame_count % skip_interval != 0:
                 continue
 
-            # YOLO Inference
-            # Filter classes if provided (and if we want to filter globally for tracking efficiency)
-            # Note: If zones have different classes, we generally need to track ALL relevant classes globally first.
-            # We collect all unique class IDs required across all zones + full frame
+            # Collect all unique class IDs required across all zones + full frame
             required_classes = set(full_frame_class_ids)
             for z in parsed_zones:
                 if not z["classes"]: # Empty means ALL
@@ -176,55 +145,50 @@ async def process_video_task(
                 required_classes.update(z["classes"])
         
             classes_arg = list(required_classes) if required_classes is not None else None
-    
-            results = model.track(frame, persist=True, tracker="bytetrack.yaml", verbose=False, classes=classes_arg)
-    
-            if results and results[0].boxes:
-                boxes = results[0].boxes.xywh.cpu().numpy()
-                track_ids = results[0].boxes.id
-                class_indices = results[0].boxes.cls.cpu().numpy() # Get detected class indices
-        
-                if track_ids is not None:
-                    track_ids = track_ids.int().cpu().tolist()
-            
-                    for box, track_id, cls_idx in zip(boxes, track_ids, class_indices):
-                        cls_idx = int(cls_idx)
-                        x, y, w, h = box
-                        center = (int(x), int(y))
-                
-                        track = track_history[track_id]
-                        track.append(center)
-                        if len(track) > 30:
-                            track.pop(0)
 
-                        # Check zones
-                        is_inside_target_zone = False
+            # ONNX Inference + Tracking
+            result = detector.track(frame, classes=classes_arg)
+    
+            if result.has_detections and result.track_ids:
+                for i, (box, track_id, cls_idx) in enumerate(
+                    zip(result.boxes_xywh, result.track_ids, result.class_ids)
+                ):
+                    cls_idx = int(cls_idx)
+                    x, y, w, h = box
+                    center = (int(x), int(y))
                 
-                        for zone in parsed_zones:
-                            # Check if this object's class matches the zone's filter
-                            # If zone.classes is empty, it matches ALL
-                            if zone["classes"] and cls_idx not in zone["classes"]:
-                                continue
-                        
-                            # pointPolygonTest returns +1 (inside), -1 (outside), 0 (on edge)
-                            dist = cv2.pointPolygonTest(zone["poly"], center, False)
+                    track = track_history[track_id]
+                    track.append(center)
+                    if len(track) > 30:
+                        track.pop(0)
+
+                    # Check zones
+                    is_inside_target_zone = False
+                
+                    for zone in parsed_zones:
+                        # Check if this object's class matches the zone's filter
+                        # If zone.classes is empty, it matches ALL
+                        if zone["classes"] and cls_idx not in zone["classes"]:
+                            continue
                     
-                            if dist >= 0:
-                                is_inside_target_zone = True
-                                if track_id not in crossed_objects:
-                                    crossed_objects[track_id] = True
+                        # pointPolygonTest returns +1 (inside), -1 (outside), 0 (on edge)
+                        dist = cv2.pointPolygonTest(zone["poly"], center, False)
                 
-                        # Also check if it matches full frame filter (visualize differently?)
-                        # For now just simple coloring logic
-                        is_relevant = is_inside_target_zone or (not parsed_zones and (not full_frame_class_ids or cls_idx in full_frame_class_ids))
+                        if dist >= 0:
+                            is_inside_target_zone = True
+                            if track_id not in crossed_objects:
+                                crossed_objects[track_id] = True
+                
+                    # Also check if it matches full frame filter
+                    is_relevant = is_inside_target_zone or (not parsed_zones and (not full_frame_class_ids or cls_idx in full_frame_class_ids))
 
-                        # Custom Drawing
-                        if is_inside_target_zone:
-                             cv2.circle(frame, center, 9, (244, 133, 66), -1) 
-                        elif track_id in crossed_objects:
-                             cv2.circle(frame, center, 9, (83, 168, 51), -1) # Green (Already counted)
-                        else:
-                             cv2.circle(frame, center, 9, (54, 67, 234), -1)
+                    # Custom Drawing
+                    if is_inside_target_zone:
+                         cv2.circle(frame, center, 9, (244, 133, 66), -1) 
+                    elif track_id in crossed_objects:
+                         cv2.circle(frame, center, 9, (83, 168, 51), -1) # Green (Already counted)
+                    else:
+                         cv2.circle(frame, center, 9, (54, 67, 234), -1)
 
             # Draw Zones
             for zone in parsed_zones:
