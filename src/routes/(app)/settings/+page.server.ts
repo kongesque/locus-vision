@@ -13,6 +13,7 @@ export const load: PageServerLoad = async ({ cookies, locals }) => {
 
     let users: any[] = [];
     let appSettings = { allow_signup: false };
+    let storageStats = null;
 
     if (isAdmin) {
         // Fetch all users
@@ -30,6 +31,14 @@ export const load: PageServerLoad = async ({ cookies, locals }) => {
         if (settingsRes.ok) {
             appSettings = await settingsRes.json();
         }
+
+        // Fetch storage stats
+        const storageRes = await fetch(`${API_BASE}/api/admin/system/storage`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (storageRes.ok) {
+            storageStats = await storageRes.json();
+        }
     }
 
     // Fetch sessions
@@ -42,7 +51,8 @@ export const load: PageServerLoad = async ({ cookies, locals }) => {
         user: locals.user,
         users,
         sessions,
-        appSettings
+        appSettings,
+        storageStats
     };
 };
 

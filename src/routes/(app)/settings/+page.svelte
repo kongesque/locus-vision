@@ -10,6 +10,8 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Sun, Moon, Monitor } from '@lucide/svelte';
+	import { setMode, resetMode } from 'mode-watcher';
 
 	let { data, form }: { data: any; form: any } = $props();
 	let loading = $state('');
@@ -106,6 +108,29 @@
 						Delete Account
 					</Button>
 				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- APPEARANCE -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-lg">Appearance</Card.Title>
+			<Card.Description>Customize the theme of the application</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<div class="flex items-center gap-4">
+				<Button variant="outline" class="flex items-center gap-2" onclick={() => setMode('light')}>
+					<Sun class="size-4" /> Light
+				</Button>
+				<Button variant="outline" class="flex items-center gap-2" onclick={() => setMode('dark')}>
+					<Moon class="size-4" /> Dark
+				</Button>
+				<Button variant="outline" class="flex items-center gap-2" onclick={() => resetMode()}>
+					<Monitor class="size-4" /> System
+				</Button>
 			</div>
 		</Card.Content>
 	</Card.Root>
@@ -270,6 +295,39 @@
 
 				{#if form?.settingsSuccess}
 					<p class="mt-2 text-sm text-green-600">Settings updated</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
+		<!-- SYSTEM STORAGE -->
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-lg">System Storage</Card.Title>
+				<Card.Description>Disk usage of the host server</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				{#if data.storageStats}
+					{@const usedGB = (data.storageStats.used / 1073741824).toFixed(1)}
+					{@const totalGB = (data.storageStats.total / 1073741824).toFixed(1)}
+					{@const freeGB = (data.storageStats.free / 1073741824).toFixed(1)}
+					{@const percent = Math.round(data.storageStats.percent_used)}
+					<div class="space-y-3">
+						<div class="flex justify-between text-sm">
+							<span class="font-medium">{usedGB} GB used</span>
+							<span class="text-muted-foreground">{freeGB} GB free</span>
+						</div>
+						<div class="h-4 w-full overflow-hidden rounded-full bg-secondary">
+							<div
+								class="h-full bg-primary transition-all duration-500 {percent > 90 ? 'bg-destructive' : ''}"
+								style="width: {percent}%"
+							></div>
+						</div>
+						<p class="text-xs text-muted-foreground mt-1">
+							{percent}% capacity • {totalGB} GB total capacity
+						</p>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">Unable to fetch storage statistics.</p>
 				{/if}
 			</Card.Content>
 		</Card.Root>
