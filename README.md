@@ -31,7 +31,16 @@ It is built to be local-first, privacy-centric, and highly optimized for edge de
 - **User Management** — admin panel for user CRUD, role assignment, activation
 - **Session Management** — view and revoke active sessions
 - **Signup Control** — admin toggle for public registration (disabled by default)
-- **Settings** — account management, password change, security controls
+- **Settings** — account management, password change, security controls, theme mode selection, system storage statistics, and media deletion
+
+## Current Status & Recent Progress
+
+Locus is under active development. Recent milestones include:
+
+- **Advanced Analytics & UI**: Unified annotation drawing across the frontend and backend. Added support for dashed zone borders, semi-transparent zone fills, colored bounding boxes with class labels, and on-screen count overlays.
+- **Directional Crossing Filters**: Enhanced line zones with intersection detection and precise crossing direction selection in both the UI and analytics engine.
+- **System & Media Management**: Introduced system storage statistics display, media deletion capabilities, theme mode selection, and complete user account deletion functionalities.
+- **Benchmarking Tools**: Optimizations to the benchmark script to accurately profile AI inference performance and deployment readiness on the Raspberry Pi 5.
 
 ## Quick Start
 
