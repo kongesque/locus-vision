@@ -424,20 +424,34 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
     # Look up camera config (type, model, zones) from DB
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT type, model_name, zones FROM cameras WHERE id = ?", (camera_id,))
+        cursor = await db.execute("SELECT type, url, model_name, zones FROM cameras WHERE id = ?", (camera_id,))
         row = await cursor.fetchone()
     finally:
         await db.close()
 
+    if not row:
+        await websocket.close()
+        return
+
     model_name = row["model_name"] if row else "yolo11n"
+    camera_type = row["type"]
+    camera_url = row["url"]
     
     # Parse zones from DB
     raw_zones = row["zones"] if row else "[]"
     zones = json.loads(raw_zones) if isinstance(raw_zones, str) else (raw_zones or [])
 
+    from services.camera_worker import camera_manager
+    
+    # If this is an RTSP stream (non-HLS), spawn the background worker to analyze frames
+    # and send results to this websocket.
+    is_hls = camera_url and (".m3u8" in camera_url.lower() or "manifest" in camera_url.lower() or "hls" in camera_url.lower())
+    if camera_type == "rtsp" and not is_hls:
+        camera_manager.spawn_rtsp_worker(camera_id)
+
     try:
         while True:
-            # Client sends binary JPEG frames
+            # Client sends binary JPEG frames (used for Webcams and HLS streams)
             data = await websocket.receive_bytes()
             from services.camera_worker import process_frame_bytes
             result = process_frame_bytes(data, camera_id, model_name, zones)
@@ -449,4 +463,8 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: str):
             active_connections[camera_id].remove(websocket)
         if not active_connections.get(camera_id):
             active_connections.pop(camera_id, None)
+            
+            # Kill the background worker if there are no more listeners
+            if camera_type == "rtsp" and not is_hls:
+                camera_manager.kill_worker(camera_id)
 

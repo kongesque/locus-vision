@@ -150,14 +150,17 @@
 			console.log('Analytics WebSocket connected');
 
 			videoEl = node.parentElement?.querySelector('video') ?? null;
-			if (!videoEl) {
-				console.warn('No <video> element found for frame capture');
+			let imgEl = node.parentElement?.querySelector('img') ?? null;
+			if (!videoEl && !imgEl) {
+				console.warn('No <video> or <img> element found for frame capture');
 			}
 
 			captureInterval = setInterval(() => {
-				// We now send frames for BOTH webcam and RTSP/HLS.
-				// Since HLS plays in the <video> tag via proxy, capturing frames here
-				// guarantees perfect synchronization between the visible video and YOLO results.
+				// Don't send frames back if we are already streaming RTSP from the backend.
+				// The backend processes RTSP streams internally and sends boxes down already!
+				if (cameraType === 'rtsp' && !isHlsUrl(cameraUrl)) return;
+
+				// We now send frames for BOTH webcam and HLS.
 				if (!videoEl || videoEl.readyState < 2 || ws.readyState !== WebSocket.OPEN) return;
 
 				captureCanvas.width = videoEl.videoWidth || 640;
@@ -312,16 +315,25 @@
 		<div class="mx-auto flex w-full max-w-5xl flex-col gap-4">
 			<div class="relative overflow-hidden rounded-lg border bg-black shadow-lg">
 				<AspectRatio ratio={16 / 9} class="group relative max-h-[80vh]">
-					<!-- Single <video> element for both webcam and RTSP/HLS -->
-					<!-- svelte-ignore a11y_media_has_caption -->
-					<video
-						use:videoAction
-						class="h-full w-full object-contain"
-						autoplay
-						playsinline
-						muted
-						crossorigin="anonymous"
-					></video>
+					{#if cameraType === 'rtsp' && !isHlsUrl(cameraUrl)}
+						<img
+							src={`http://localhost:8000/api/cameras/stream/${taskId}`}
+							alt="Live Stream"
+							class="h-full w-full object-contain"
+							crossorigin="anonymous"
+						/>
+					{:else}
+						<!-- Single <video> element for both webcam and RTSP/HLS -->
+						<!-- svelte-ignore a11y_media_has_caption -->
+						<video
+							use:videoAction
+							class="h-full w-full object-contain"
+							autoplay
+							playsinline
+							muted
+							crossorigin="anonymous"
+						></video>
+					{/if}
 
 					<canvas use:overlayAction class="pointer-events-none absolute top-0 left-0 h-full w-full"
 					></canvas>
