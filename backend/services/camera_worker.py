@@ -145,10 +145,11 @@ class RtspWorker:
 
         target_fps = 10
         frame_time = 1.0 / target_fps
+        last_process_time = 0
 
         while self.is_running and cap.isOpened():
-            t0 = time.time()
-            ret, frame = cap.read()
+            # Constantly pull frames from the buffer to ensure we aren't lagging behind and creating glitchy/delayed analytics over the live video
+            ret = cap.grab()
             if not ret:
                 time.sleep(2)
                 cap = cv2.VideoCapture(cam["url"])
@@ -158,19 +159,20 @@ class RtspWorker:
                 time.sleep(0.5)
                 continue
 
-            result = engine.process_frame(frame)
+            current_time = time.time()
+            if current_time - last_process_time >= frame_time:
+                last_process_time = current_time
+                ret, frame = cap.retrieve()
+                if not ret: continue
+                result = engine.process_frame(frame)
 
-            payload = json.dumps({
-                "event": "analytics",
-                "resolution": result.resolution,
-                "boxes": result.boxes,
-                "count": result.total_count,
-            })
-            self._broadcast(payload)
-
-            dt = time.time() - t0
-            if dt < frame_time:
-                time.sleep(frame_time - dt)
+                payload = json.dumps({
+                    "event": "analytics",
+                    "resolution": result.resolution,
+                    "boxes": result.boxes,
+                    "count": result.total_count,
+                })
+                self._broadcast(payload)
 
         cap.release()
 

@@ -306,6 +306,24 @@ SQLite schema is auto-created on startup via `database.py`. For migrations:
 1. Add new CREATE TABLE / ALTER TABLE to `init_db()` in `database.py`
 2. Or create a one-off migration script in `backend/scripts/`
 
+### Testing Real RTSP Streams Locally
+
+To test sub-second latency RTSP streaming (NVR behavior) without a physical IP camera, you can broadcast a YouTube video out as a true RTSP stream using `mediamtx`, `ffmpeg`, and `yt-dlp`.
+
+1. Install dependencies and start the RTSP server:
+```bash
+brew install mediamtx ffmpeg yt-dlp
+mediamtx
+```
+
+2. In a second terminal, extract the raw streaming URL and aggressively broadcast it via FFmpeg:
+```bash
+RAW_URL=$(yt-dlp -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' -g "https://www.youtube.com/watch?v=Q71sLS8h9a4")
+ffmpeg -re -i "$RAW_URL" -c:v copy -c:a aac -f rtsp -rtsp_transport tcp rtsp://localhost:8554/youtube
+```
+
+3. In LocusVision, add the camera using the URL: `rtsp://localhost:8554/youtube`
+
 ## Deployment Notes
 
 ### Target Platform

@@ -46,8 +46,12 @@
 		if (!videoRef || !containerRef) return;
 
 		const { width: cw, height: ch } = containerRef.getBoundingClientRect();
-		const nw = videoRef.videoWidth;
-		const nh = videoRef.videoHeight;
+		// Handle both <video> and <img> elements
+		const isImg = videoRef instanceof HTMLImageElement;
+		const nw = isImg ? (videoRef as unknown as HTMLImageElement).naturalWidth : videoRef.videoWidth;
+		const nh = isImg
+			? (videoRef as unknown as HTMLImageElement).naturalHeight
+			: videoRef.videoHeight;
 
 		if (nw === 0 || nh === 0) return;
 
@@ -127,14 +131,9 @@
 		} else {
 			// Direct URL (RTSP won't work in browser, but HTTP streams might)
 			// Fall back to MJPEG backend proxy for true RTSP
-			videoRef.src = `http://localhost:8000/api/cameras/stream/${cameraId}`;
-			videoRef.addEventListener('loadedmetadata', () => {
-				isLoading = false;
-			});
-			videoRef.addEventListener('error', () => {
-				isLoading = false;
-				error = 'Could not play stream. True RTSP requires a transcoder (go2rtc/ffmpeg).';
-			});
+			// Because MJPEG is an image stream, it must be rendered in an <img> tag (in the template below),
+			// not the <video> tag, so we just set isLoading to false and skip setting videoRef.src.
+			isLoading = false;
 		}
 	}
 
@@ -173,17 +172,29 @@
 			</div>
 		{/if}
 
-		<!-- Native video playback — full FPS, hardware decoded -->
+		<!-- Native video playback — full FPS, hardware decoded (or MJPEG stream proxy) -->
 		<!-- svelte-ignore a11y_media_has_caption -->
-		<video
-			bind:this={videoRef}
-			class="pointer-events-none max-h-full max-w-full object-contain"
-			autoplay
-			playsinline
-			muted
-			onloadedmetadata={updateDims}
-			onresize={updateDims}
-		></video>
+		{#if isHlsUrl(url)}
+			<video
+				bind:this={videoRef}
+				class="pointer-events-none max-h-full max-w-full object-contain"
+				autoplay
+				playsinline
+				muted
+				onloadedmetadata={updateDims}
+				onresize={updateDims}
+			></video>
+		{:else}
+			<img
+				bind:this={videoRef as any}
+				src={`http://localhost:8000/api/cameras/stream/${cameraId}`}
+				alt="Camera view"
+				class="pointer-events-none max-h-full max-w-full object-contain"
+				onload={updateDims}
+				onresize={updateDims}
+				crossorigin="anonymous"
+			/>
+		{/if}
 
 		<!-- Drawing Canvas Overlay -->
 		{#if videoDims}
