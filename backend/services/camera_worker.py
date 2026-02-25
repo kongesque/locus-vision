@@ -164,6 +164,14 @@ class RtspWorker:
                 last_process_time = current_time
                 ret, frame = cap.retrieve()
                 if not ret: continue
+
+                # Match the livestream MJPEG stream downscaling to lock coordinate space
+                MAX_WIDTH = 1280
+                h, w = frame.shape[:2]
+                if w > MAX_WIDTH:
+                    scale = MAX_WIDTH / w
+                    frame = cv2.resize(frame, (MAX_WIDTH, int(h * scale)), interpolation=cv2.INTER_AREA)
+
                 result = engine.process_frame(frame)
 
                 payload = json.dumps({
