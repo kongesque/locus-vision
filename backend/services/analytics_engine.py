@@ -17,6 +17,7 @@ class AnalyticsResult:
     """Result from a single frame analysis."""
     boxes: list          # List of box dicts {id, x, y, w, h, class, conf, label, in_zone}
     total_count: int     # Total unique objects that have entered any zone
+    zone_counts: dict    # {zone_id: count}
     resolution: dict     # {w, h}
 
 
@@ -74,6 +75,7 @@ class AnalyticsEngine:
         self.detector: OnnxDetector = get_detector(model_name)
         self.track_history: dict[int, list] = {}
         self.crossed_objects: dict[int, bool] = {}
+        self.zone_crossed_objects: dict[str, set[int]] = {}
         self.parsed_zones: list[ParsedZone] = []
         self.full_frame_class_ids: list[int] = []
 
@@ -104,11 +106,14 @@ class AnalyticsEngine:
                 zone_type=z_type,
                 direction=zone.get("direction", "both")
             ))
+            self.zone_crossed_objects[zone.get("id", "")] = set()
 
     def reset(self):
         """Reset all tracking state (call between different sources)."""
         self.track_history.clear()
         self.crossed_objects.clear()
+        for v in self.zone_crossed_objects.values():
+            v.clear()
         self.detector.reset_tracker()
 
     def process_frame(self, frame: np.ndarray) -> AnalyticsResult:
@@ -154,6 +159,7 @@ class AnalyticsEngine:
                                 in_zone = True
                                 if track_id not in self.crossed_objects:
                                     self.crossed_objects[track_id] = True
+                                self.zone_crossed_objects[zone.zone_id].add(int(track_id))
                                 break
                         elif zone.zone_type == "line":
                             if len(zone.poly) >= 2 and len(track) >= 2:
@@ -175,6 +181,7 @@ class AnalyticsEngine:
                                         in_zone = True
                                         if track_id not in self.crossed_objects:
                                             self.crossed_objects[track_id] = True
+                                        self.zone_crossed_objects[zone.zone_id].add(int(track_id))
                                         break
                 else:
                     # No zones defined — count everything matching full-frame filter
@@ -198,6 +205,7 @@ class AnalyticsEngine:
         return AnalyticsResult(
             boxes=boxes_data,
             total_count=len(self.crossed_objects),
+            zone_counts={z_id: len(tracks) for z_id, tracks in self.zone_crossed_objects.items()},
             resolution={"w": w, "h": h},
         )
 
@@ -278,11 +286,33 @@ class AnalyticsEngine:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
         # Count overlay (top-left)
-        count_text = f"Count: {result.total_count}"
-        cv2.putText(frame, count_text, (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 4, cv2.LINE_AA)
-        cv2.putText(frame, count_text, (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2, cv2.LINE_AA)
+        y_offset = 40
+        if not self.parsed_zones:
+            count_text = f"Count: {result.total_count}"
+            cv2.putText(frame, count_text, (20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 4, cv2.LINE_AA)
+            cv2.putText(frame, count_text, (20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2, cv2.LINE_AA)
+        else:
+            for zone in self.parsed_zones:
+                zone_count = result.zone_counts.get(zone.zone_id, 0)
+                # Parse zone name from zone_id if possible or just use zone_id
+                # Often zone_id is a UUID or simply string. If we want a nice name, we check if there's a name.
+                # Since ParsedZone doesn't store name right now, let's just display "Zone ...: X"
+                # Wait, does the zone have a name property? Checking ParsedZone...
+                # It doesn't, but let's just show standard text.
+                # We can draw it with the zone's color to make it clear.
+                label_text = f"Zone {zone.zone_id[:8]}: {zone_count}" if len(zone.zone_id) > 8 else f"{zone.zone_id}: {zone_count}"
+                
+                # Dark outline
+                cv2.putText(frame, label_text, (20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4, cv2.LINE_AA)
+                # Colored text matching zone color
+                cv2.putText(frame, label_text, (20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, zone.color, 2, cv2.LINE_AA)
+                
+                y_offset += 40
+
 
     # ── Private helpers ──────────────────────────────────────────
 
