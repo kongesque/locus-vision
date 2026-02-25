@@ -94,10 +94,6 @@
 		</div>
 		<div class="flex items-center gap-2">
 			{#if status === 'ready'}
-				<Button variant="outline" size="sm" class="gap-2">
-					<Share2 class="h-4 w-4" />
-					Share
-				</Button>
 				<Button size="sm" class="gap-2" href={videoSrc} download>
 					<Download class="h-4 w-4" />
 					Export Video
