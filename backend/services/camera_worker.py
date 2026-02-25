@@ -65,6 +65,7 @@ def process_frame_bytes(jpeg_bytes: bytes, camera_id: str, model_name: str = "yo
         "resolution": result.resolution,
         "boxes": result.boxes,
         "count": result.total_count,
+        "zone_counts": result.zone_counts,
     }
 
 
@@ -179,6 +180,7 @@ class RtspWorker:
                     "resolution": result.resolution,
                     "boxes": result.boxes,
                     "count": result.total_count,
+                    "zone_counts": result.zone_counts,
                 })
                 self._broadcast(payload)
 
