@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { AspectRatio } from '$lib/components/ui/aspect-ratio';
 	import { videoStore } from '$lib/stores/video.svelte';
+	import Hls from 'hls.js';
 
 	const taskId = $derived($page.params.taskId);
 
@@ -32,9 +33,14 @@
 		].slice(0, 50); // Keep last 50
 	}
 
+	function isHlsUrl(src: string): boolean {
+		return src.includes('.m3u8') || src.includes('manifest') || src.includes('hls');
+	}
+
 	// Action for initializing the camera feed
 	function videoAction(node: HTMLVideoElement) {
 		let isDestroyed = false;
+		let hlsInstance: Hls | null = null;
 
 		const initVideo = async () => {
 			try {
@@ -71,9 +77,47 @@
 						}
 					}
 				} else if (camera.type === 'rtsp' && camera.url) {
-					// The template automatically mounts the <img> tag for the annotated MJPEG proxy feed.
-					// We just need to mark as live.
-					cameraStatus = 'live';
+					// Play HLS/RTSP stream in the <video> element natively
+					if (isHlsUrl(camera.url)) {
+						const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(camera.url)}`;
+
+						if (Hls.isSupported()) {
+							hlsInstance = new Hls({
+								lowLatencyMode: true,
+								enableWorker: true,
+								backBufferLength: 0,
+								maxBufferLength: 2,
+								maxMaxBufferLength: 4,
+								liveSyncDurationCount: 1,
+								liveMaxLatencyDurationCount: 3,
+								liveDurationInfinity: true,
+								maxBufferSize: 0,
+								startFragPrefetch: true
+							});
+							hlsInstance.loadSource(proxyUrl);
+							hlsInstance.attachMedia(node);
+							hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+								cameraStatus = 'live';
+								node.play().catch(() => {});
+							});
+							hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
+								if (data.fatal) {
+									console.error('HLS error:', data);
+									errorMsg = `Stream error: ${data.details}`;
+									cameraStatus = 'error';
+								}
+							});
+						} else if (node.canPlayType('application/vnd.apple.mpegurl')) {
+							node.src = proxyUrl;
+							node.addEventListener('loadedmetadata', () => {
+								cameraStatus = 'live';
+								node.play().catch(() => {});
+							});
+						}
+					} else {
+						// True RTSP (not HLS proxyable natively via <video>). Relies on MJPEG route.
+						cameraStatus = 'live';
+					}
 				}
 			} catch (err) {
 				if (isDestroyed) return;
@@ -88,6 +132,10 @@
 		return {
 			destroy() {
 				isDestroyed = true;
+				if (hlsInstance) {
+					hlsInstance.destroy();
+					hlsInstance = null;
+				}
 			}
 		};
 	}
@@ -334,8 +382,8 @@
 		<div class="mx-auto flex w-full max-w-5xl flex-col gap-4">
 			<div class="relative overflow-hidden rounded-lg border bg-black shadow-lg">
 				<AspectRatio ratio={16 / 9} class="group relative max-h-[80vh]">
-					{#if cameraType === 'rtsp'}
-						<!-- Display backend's synced annotated MJPEG feed -->
+					{#if cameraType === 'rtsp' && !isHlsUrl(cameraUrl)}
+						<!-- True RTSP (without HLS) falls back to the MJPEG feed -->
 						<img
 							src={`http://localhost:8000/api/cameras/stream/${taskId}`}
 							alt="Live Stream"
@@ -343,7 +391,7 @@
 							crossorigin="anonymous"
 						/>
 					{:else}
-						<!-- Webcams still use local blob <video> and canvas overlay math -->
+						<!-- HLS natively decodes in <video> -->
 						<!-- svelte-ignore a11y_media_has_caption -->
 						<video
 							use:videoAction

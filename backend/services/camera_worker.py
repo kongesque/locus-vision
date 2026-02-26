@@ -35,13 +35,21 @@ def get_camera_engine(camera_id: str, model_name: str = "yolo11n", zones: list =
             zones=zones,
             full_frame_classes=full_frame_classes,
         )
+    else:
+        # Dynamically update the config on the existing engine so it respects live database
+        # changes without losing global counts/track history.
+        engine = _camera_engines[camera_id]
+        if zones is not None:
+            engine.set_zones(zones)
+        if full_frame_classes is not None:
+            engine.full_frame_class_ids = engine._get_class_ids(full_frame_classes)
+            
     return _camera_engines[camera_id]
 
 
-def update_camera_engine(camera_id: str, zones: list = None):
-    """Update zones on an existing camera engine."""
-    if camera_id in _camera_engines and zones is not None:
-        _camera_engines[camera_id].set_zones(zones)
+def update_camera_engine(camera_id: str, zones: list = None, full_frame_classes: list = None):
+    """Update zones or tracking filters on an existing camera engine."""
+    get_camera_engine(camera_id, zones=zones, full_frame_classes=full_frame_classes)
 
 
 # ── Webcam "inline" processor (runs per-frame, called from the WS handler) ──
@@ -157,60 +165,119 @@ class IpCameraWorker:
 
         engine = get_camera_engine(self.camera_id, model_name, zones, full_frame_classes)
 
-        cap = cv2.VideoCapture(cam["url"])
-        if not cap.isOpened():
+        # ── Threaded Frame Grabber (Zero-Latency) ──
+        # OpenCV's internal stream buffer accumulates lag if processing is slower than the framerate.
+        # This dedicated thread constantly drains the buffer and only exposes the absolute latest frame.
+        class FrameGrabber:
+            def __init__(self, src):
+                self.cap = cv2.VideoCapture(src)
+                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                self.latest_frame = None
+                self.lock = threading.Lock()
+                self.running = True
+                self.thread = threading.Thread(target=self._grab_loop, daemon=True)
+                self.thread.start()
+
+            def _grab_loop(self):
+                while self.running:
+                    if not self.cap.isOpened():
+                        break
+                    grabbed = self.cap.grab()
+                    if not grabbed:
+                        time.sleep(0.01)
+                        continue
+                    ret, frame = self.cap.retrieve()
+                    if ret and frame is not None:
+                        with self.lock:
+                            self.latest_frame = frame
+
+            def get_frame(self):
+                with self.lock:
+                    return self.latest_frame
+
+            def stop(self):
+                self.running = False
+                self.thread.join(timeout=2)
+                self.cap.release()
+
+        grabber = FrameGrabber(cam["url"])
+
+        if not grabber.cap.isOpened():
             print(f"[RTSP-{self.camera_id}] Cannot open stream: {cam['url']}")
+            grabber.stop()
             self.is_running = False
             return
 
-        target_fps = 10
-        frame_time = 1.0 / target_fps
-        last_process_time = 0
+        # ── Threaded YOLO Processor (10 FPS) ──
+        # Processes the latest frame from the grabber.
+        class YoloThread:
+            def __init__(self, grabber_ref, engine_ref, worker_ref):
+                self.grabber = grabber_ref
+                self.engine = engine_ref
+                self.worker = worker_ref
+                self.running = True
+                self.latest_result = None
+                self.lock = threading.Lock()
+                self.thread = threading.Thread(target=self._run_loop, daemon=True)
+                self.thread.start()
 
-        while self.is_running and cap.isOpened():
-            # Constantly pull frames from the buffer to ensure we aren't lagging behind and creating glitchy/delayed analytics over the live video
-            ret = cap.grab()
-            if not ret:
-                time.sleep(2)
-                cap = cv2.VideoCapture(cam["url"])
-                continue
+            def _run_loop(self):
+                target_fps = 10
+                frame_time = 1.0 / target_fps
+                last_process_time = 0
 
-            current_time = time.time()
-            if current_time - last_process_time >= frame_time:
-                last_process_time = current_time
-                ret, frame = cap.retrieve()
-                if not ret: continue
+                while self.running and self.worker.is_running and self.grabber.running:
+                    current_time = time.time()
+                    if current_time - last_process_time >= frame_time:
+                        last_process_time = current_time
+                        
+                        frame = self.grabber.get_frame()
+                        if frame is None:
+                            continue
 
-                # Match the livestream MJPEG stream downscaling to lock coordinate space
-                MAX_WIDTH = 1280
-                h, w = frame.shape[:2]
-                scale_factor = 1.0
-                if w > MAX_WIDTH:
-                    scale_factor = MAX_WIDTH / w
-                    frame = cv2.resize(frame, (MAX_WIDTH, int(h * scale_factor)), interpolation=cv2.INTER_AREA)
+                        # Match the livestream MJPEG stream downscaling to lock coordinate space
+                        MAX_WIDTH = 1280
+                        h, w = frame.shape[:2]
+                        scale_factor = 1.0
+                        if w > MAX_WIDTH:
+                            scale_factor = MAX_WIDTH / w
+                            frame = cv2.resize(frame, (MAX_WIDTH, int(h * scale_factor)), interpolation=cv2.INTER_AREA)
 
-                result = engine.process_frame(frame, scale=scale_factor)
-                
-                # Burn annotations directly into the video frame
-                engine.draw_annotations(frame, result)
-                
-                # Encode the annotated frame to JPEG for the MJPEG stream
-                JPEG_QUALITY = 75
-                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-                
-                with self.frame_lock:
-                    self.latest_frame_bytes = buffer.tobytes()
-                self.frame_ready.set()
+                        result = self.engine.process_frame(frame, scale=scale_factor)
+                        
+                        with self.lock:
+                            self.latest_result = result
+                        # Broadcast counts and bounding boxes for native frontend rendering
+                        payload = json.dumps({
+                            "event": "analytics",
+                            "count": result.total_count,
+                            "zone_counts": result.zone_counts,
+                            "boxes": result.boxes,
+                            "resolution": result.resolution,
+                        })
+                        self.worker._broadcast(payload)
+                    else:
+                        time.sleep(0.01)
 
-                # Broadcast counts (UI badge updating) but exclude boxes to save massive JSON bandwidth
-                payload = json.dumps({
-                    "event": "analytics",
-                    "count": result.total_count,
-                    "zone_counts": result.zone_counts,
-                })
-                self._broadcast(payload)
+            def get_result(self):
+                with self.lock:
+                    return self.latest_result
 
-        cap.release()
+            def stop(self):
+                self.running = False
+                self.thread.join(timeout=2)
+
+        # Fire up the threads
+        yolo_thread = YoloThread(grabber, engine, self)
+
+        # Main worker simply blocks until stopped externally
+        while self.is_running and grabber.running:
+            time.sleep(1.0)
+
+        # Cleanup
+        self.is_running = False
+        yolo_thread.stop()
+        grabber.stop()
 
 
 # ── Manager singleton ───────────────────────────────────────────
