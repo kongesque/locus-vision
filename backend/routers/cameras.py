@@ -141,18 +141,23 @@ async def stream_camera(camera_id: str):
     """
     from services.camera_worker import camera_manager
     from fastapi.responses import StreamingResponse
+    import asyncio
     
     worker = camera_manager._workers.get(camera_id)
     if not worker or not worker.is_running:
         raise HTTPException(status_code=404, detail="Camera tracking worker not running")
 
-    def generate_frames():
+    async def generate_frames():
         while worker.is_running:
-            frame_bytes = worker.get_annotated_frame()
+            # We are in an async generator, but getting the frame uses a thread lock on the shared memory.
+            # To avoid event loop blocking, we run it in a thread pool.
+            frame_bytes = await asyncio.to_thread(worker.get_annotated_frame)
+            
             if frame_bytes is None:
                 # Timed out waiting for frame or worker stopped
                 if not worker.is_running:
                     break
+                await asyncio.sleep(0.1)
                 continue
             
             yield (
@@ -161,6 +166,8 @@ async def stream_camera(camera_id: str):
                 b"Content-Length: " + str(len(frame_bytes)).encode() + b"\r\n"
                 b"\r\n" + frame_bytes + b"\r\n"
             )
+            # Sleep slightly to match target ~10 FPS
+            await asyncio.sleep(0.1)
 
     return StreamingResponse(
         generate_frames(),

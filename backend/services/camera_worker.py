@@ -8,12 +8,13 @@ Two modes:
 Both modes now use the shared AnalyticsEngine for zone-aware counting.
 """
 import asyncio
-import threading
 import cv2
 import json
 import time
 import sqlite3
 import os
+import multiprocessing
+import ctypes
 import numpy as np
 from services.analytics_engine import AnalyticsEngine
 
@@ -78,52 +79,221 @@ def process_frame_bytes(jpeg_bytes: bytes, camera_id: str, model_name: str = "yo
     }
 
 
-# ── RTSP background thread worker ──────────────────────────────
+# ── RTSP Multiprocessing Worker ──────────────────────────────
 
 def _dict_factory(cursor, row):
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
 
 
+def camera_process_run(
+    camera_id: str,
+    db_path: str,
+    event_queue: multiprocessing.Queue,
+    frame_array: multiprocessing.Array,
+    frame_size_value: multiprocessing.Value
+):
+    """
+    The entrypoint for the isolated child process.
+    Connects to the stream, runs YOLO+Motion Detection via the AnalyticsEngine,
+    and pushes results back to the FastAPI parent via IPC Queues/Shared Memory.
+    """
+    # 1. Fetch config from DB
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = _dict_factory
+        cam = conn.cursor().execute("SELECT * FROM cameras WHERE id = ?", (camera_id,)).fetchone()
+        conn.close()
+    except Exception as e:
+        print(f"[RTSP-Worker-{camera_id}] DB error: {e}")
+        return
+
+    if not cam or not cam.get("url"):
+        print(f"[RTSP-Worker-{camera_id}] No URL configured.")
+        return
+
+    # Parse zones and classes
+    zones = json.loads(cam.get("zones", "[]")) if isinstance(cam.get("zones"), str) else cam.get("zones", [])
+    classes_raw = cam.get("classes", "[]")
+    full_frame_classes = json.loads(classes_raw) if isinstance(classes_raw, str) else classes_raw
+    model_name = cam.get("model_name", "yolo11n")
+
+    # Initialize isolated Analytics Engine
+    engine = AnalyticsEngine(model_name, zones, full_frame_classes)
+
+    # 2. Open Stream
+    cap = cv2.VideoCapture(cam["url"])
+    # Minimize internal OpenCV buffer to prevent lag accumulation
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+    if not cap.isOpened():
+        print(f"[RTSP-Worker-{camera_id}] Cannot open stream: {cam['url']}")
+        return
+
+    target_fps = 10
+    frame_time = 1.0 / target_fps
+    last_process_time = 0
+
+    print(f"[RTSP-Worker-{camera_id}] Starting AI processing loop...")
+
+    try:
+        while True:
+            # Continuously drain the buffer.
+            # cv2.grab() is fast and just pulls the frame off the network stack.
+            grabbed = cap.grab()
+            if not grabbed:
+                time.sleep(0.01)
+                continue
+
+            current_time = time.time()
+            if current_time - last_process_time >= frame_time:
+                last_process_time = current_time
+                
+                # Actually decode the frame from the buffer
+                ret, frame = cap.retrieve()
+                if not ret or frame is None:
+                    continue
+
+                # Standardize processing resolution
+                MAX_WIDTH = 1280
+                h, w = frame.shape[:2]
+                scale_factor = 1.0
+                if w > MAX_WIDTH:
+                    scale_factor = MAX_WIDTH / w
+                    frame = cv2.resize(frame, (MAX_WIDTH, int(h * scale_factor)), interpolation=cv2.INTER_AREA)
+
+                # Run Analytics (Includes Motion Detection + YOLO)
+                result = engine.process_frame(frame, scale=scale_factor)
+
+                # 1. Send JSON Analytics event to parent (for WebSockets)
+                payload = json.dumps({
+                    "event": "analytics",
+                    "count": result.total_count,
+                    "zone_counts": result.zone_counts,
+                    "boxes": result.boxes,
+                    "resolution": result.resolution,
+                })
+                try:
+                    # Put it on the queue without blocking forever
+                    event_queue.put_nowait((camera_id, payload))
+                except Exception:
+                    pass  # Queue full, skip frame
+
+                # 2. Burn annotations and update Shared Memory MJPEG (for live video feed)
+                engine.draw_annotations(frame, result)
+                # Encode as JPEG
+                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                jpeg_bytes = buffer.tobytes()
+                
+                size = len(jpeg_bytes)
+                # Ensure we do not overflow the shared memory buffer (e.g. 2MB)
+                if size <= len(frame_array):
+                    with frame_size_value.get_lock():
+                        frame_size_value.value = size
+                        ctypes.memmove(frame_array.get_obj(), jpeg_bytes, size)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        cap.release()
+        print(f"[RTSP-Worker-{camera_id}] Stopped.")
+
+
 class IpCameraWorker:
     """
-    A background thread that reads from an IP Camera URL, runs YOLO with
-    zone-aware counting, burns annotations into the frame, and provides
-    a unified MJPEG stream for the frontend, eliminating latency and sync issues.
+    Manages the lifecycle of a dedicated multiprocessing.Process for a specific camera.
     """
-    def __init__(self, camera_id: str, loop: asyncio.AbstractEventLoop):
+    def __init__(self, camera_id: str):
         self.camera_id = camera_id
-        self.loop = loop
         self.is_running = False
-        self._thread = None
+        self._process: multiprocessing.Process | None = None
         
-        # Stream sharing state
-        self.latest_frame_bytes: bytes | None = None
-        self.frame_lock = threading.Lock()
-        self.frame_ready = threading.Event()
+        # IPC Mechanisms
+        self.event_queue = multiprocessing.Queue(maxsize=100)
+        # Allocate 2MB of shared memory for the current JPEG frame
+        self.frame_array = multiprocessing.Array(ctypes.c_byte, 2 * 1024 * 1024)
+        self.frame_size = multiprocessing.Value(ctypes.c_int, 0)
 
     def start(self):
         if not self.is_running:
             self.is_running = True
-            self._thread = threading.Thread(target=self._run, daemon=True)
-            self._thread.start()
+            self._process = multiprocessing.Process(
+                target=camera_process_run,
+                args=(
+                    self.camera_id,
+                    settings.database_path,
+                    self.event_queue,
+                    self.frame_array,
+                    self.frame_size
+                ),
+                daemon=True # Dies if the parent FastAPI process dies
+            )
+            self._process.start()
 
     def stop(self):
         self.is_running = False
-        if self._thread:
-            self._thread.join(timeout=2)
+        if self._process:
+            self._process.terminate()
+            self._process.join(timeout=2)
+            if self._process.is_alive():
+                self._process.kill()
             
     def get_annotated_frame(self) -> bytes | None:
         """Called by the FastAPI generator to stream the latest annotated JPEG."""
-        self.frame_ready.wait(timeout=2.0)
-        with self.frame_lock:
-            frame_bytes = self.latest_frame_bytes
-        self.frame_ready.clear()
+        with self.frame_size.get_lock():
+            size = self.frame_size.value
+            if size == 0:
+                return None
+            
+            # Read bytes from shared memory
+            frame_bytes = ctypes.string_at(self.frame_array.get_obj(), size)
+            
         return frame_bytes
 
-    def _broadcast(self, msg: str):
-        conns = active_connections.get(self.camera_id, [])
+
+# ── Manager singleton ───────────────────────────────────────────
+
+class CameraWorkerManager:
+    def __init__(self):
+        self._workers: dict[str, IpCameraWorker] = {}
+        self.loop = None
+        self._poll_task = None
+
+    def initialize(self, loop: asyncio.AbstractEventLoop):
+        self.loop = loop
+        # Start a background asyncio task in the main FastAPI process 
+        # to constantly read from all the child process event queues
+        self._poll_task = loop.create_task(self._poll_queues())
+
+    async def _poll_queues(self):
+        """Continuously pulls websocket events from all child processes and broadcasts them."""
+        while True:
+            try:
+                # We need to quickly poll each active worker's queue
+                # We use asyncio.sleep(0.01) to not block the main event loop
+                for worker in list(self._workers.values()):
+                    if not worker.is_running:
+                        continue
+                        
+                    try:
+                        while not worker.event_queue.empty():
+                            cam_id, msg = worker.event_queue.get_nowait()
+                            self._broadcast_event(cam_id, msg)
+                    except Exception:
+                        pass
+                
+                await asyncio.sleep(0.01)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"Error polling camera queues: {e}")
+                await asyncio.sleep(1)
+
+    def _broadcast_event(self, camera_id: str, msg: str):
+        """Sends the JSON analytics payload to all connected frontend WebSockets."""
+        conns = active_connections.get(camera_id, [])
         if not conns:
             return
+            
         async def _send():
             dead = []
             for ws in conns:
@@ -134,166 +304,13 @@ class IpCameraWorker:
             for ws in dead:
                 if ws in conns:
                     conns.remove(ws)
+                    
         asyncio.run_coroutine_threadsafe(_send(), self.loop)
-
-    def _run(self):
-        db_path = settings.database_path
-        try:
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = _dict_factory
-            cam = conn.cursor().execute(
-                "SELECT * FROM cameras WHERE id = ?", (self.camera_id,)
-            ).fetchone()
-            conn.close()
-        except Exception as e:
-            print(f"[RTSP-{self.camera_id}] DB error: {e}")
-            self.is_running = False
-            return
-
-        if not cam or not cam.get("url"):
-            print(f"[RTSP-{self.camera_id}] No URL configured.")
-            self.is_running = False
-            return
-
-        # Parse zones and classes from DB
-        zones = json.loads(cam.get("zones", "[]")) if isinstance(cam.get("zones"), str) else cam.get("zones", [])
-        
-        classes_raw = cam.get("classes", "[]")
-        full_frame_classes = json.loads(classes_raw) if isinstance(classes_raw, str) else classes_raw
-
-        model_name = cam.get("model_name", "yolo11n")
-
-        engine = get_camera_engine(self.camera_id, model_name, zones, full_frame_classes)
-
-        # ── Threaded Frame Grabber (Zero-Latency) ──
-        # OpenCV's internal stream buffer accumulates lag if processing is slower than the framerate.
-        # This dedicated thread constantly drains the buffer and only exposes the absolute latest frame.
-        class FrameGrabber:
-            def __init__(self, src):
-                self.cap = cv2.VideoCapture(src)
-                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                self.latest_frame = None
-                self.lock = threading.Lock()
-                self.running = True
-                self.thread = threading.Thread(target=self._grab_loop, daemon=True)
-                self.thread.start()
-
-            def _grab_loop(self):
-                while self.running:
-                    if not self.cap.isOpened():
-                        break
-                    grabbed = self.cap.grab()
-                    if not grabbed:
-                        time.sleep(0.01)
-                        continue
-                    ret, frame = self.cap.retrieve()
-                    if ret and frame is not None:
-                        with self.lock:
-                            self.latest_frame = frame
-
-            def get_frame(self):
-                with self.lock:
-                    return self.latest_frame
-
-            def stop(self):
-                self.running = False
-                self.thread.join(timeout=2)
-                self.cap.release()
-
-        grabber = FrameGrabber(cam["url"])
-
-        if not grabber.cap.isOpened():
-            print(f"[RTSP-{self.camera_id}] Cannot open stream: {cam['url']}")
-            grabber.stop()
-            self.is_running = False
-            return
-
-        # ── Threaded YOLO Processor (10 FPS) ──
-        # Processes the latest frame from the grabber.
-        class YoloThread:
-            def __init__(self, grabber_ref, engine_ref, worker_ref):
-                self.grabber = grabber_ref
-                self.engine = engine_ref
-                self.worker = worker_ref
-                self.running = True
-                self.latest_result = None
-                self.lock = threading.Lock()
-                self.thread = threading.Thread(target=self._run_loop, daemon=True)
-                self.thread.start()
-
-            def _run_loop(self):
-                target_fps = 10
-                frame_time = 1.0 / target_fps
-                last_process_time = 0
-
-                while self.running and self.worker.is_running and self.grabber.running:
-                    current_time = time.time()
-                    if current_time - last_process_time >= frame_time:
-                        last_process_time = current_time
-                        
-                        frame = self.grabber.get_frame()
-                        if frame is None:
-                            continue
-
-                        # Match the livestream MJPEG stream downscaling to lock coordinate space
-                        MAX_WIDTH = 1280
-                        h, w = frame.shape[:2]
-                        scale_factor = 1.0
-                        if w > MAX_WIDTH:
-                            scale_factor = MAX_WIDTH / w
-                            frame = cv2.resize(frame, (MAX_WIDTH, int(h * scale_factor)), interpolation=cv2.INTER_AREA)
-
-                        result = self.engine.process_frame(frame, scale=scale_factor)
-                        
-                        with self.lock:
-                            self.latest_result = result
-                        # Broadcast counts and bounding boxes for native frontend rendering
-                        payload = json.dumps({
-                            "event": "analytics",
-                            "count": result.total_count,
-                            "zone_counts": result.zone_counts,
-                            "boxes": result.boxes,
-                            "resolution": result.resolution,
-                        })
-                        self.worker._broadcast(payload)
-                    else:
-                        time.sleep(0.01)
-
-            def get_result(self):
-                with self.lock:
-                    return self.latest_result
-
-            def stop(self):
-                self.running = False
-                self.thread.join(timeout=2)
-
-        # Fire up the threads
-        yolo_thread = YoloThread(grabber, engine, self)
-
-        # Main worker simply blocks until stopped externally
-        while self.is_running and grabber.running:
-            time.sleep(1.0)
-
-        # Cleanup
-        self.is_running = False
-        yolo_thread.stop()
-        grabber.stop()
-
-
-# ── Manager singleton ───────────────────────────────────────────
-
-class CameraWorkerManager:
-    def __init__(self):
-        self._workers: dict[str, IpCameraWorker] = {}
-        self.loop = None
-
-    def initialize(self, loop: asyncio.AbstractEventLoop):
-        self.loop = loop
 
     def spawn_worker(self, camera_id: str):
         if camera_id in self._workers:
             self._workers[camera_id].stop()
-        w = IpCameraWorker(camera_id, self.loop)
+        w = IpCameraWorker(camera_id)
         self._workers[camera_id] = w
         w.start()
 
@@ -303,6 +320,9 @@ class CameraWorkerManager:
             del self._workers[camera_id]
 
     def shutdown_all(self):
+        if self._poll_task:
+            self._poll_task.cancel()
+            
         for w in self._workers.values():
             w.stop()
         self._workers.clear()

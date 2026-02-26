@@ -83,6 +83,11 @@ class AnalyticsEngine:
             self.set_zones(zones)
         if full_frame_classes:
             self.full_frame_class_ids = self._get_class_ids(full_frame_classes)
+            
+        # Motion detection optimization
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=False)
+        self.motion_threshold_pixels = 500  # Minimum moving pixels to trigger YOLO
+        self.last_result: Optional[AnalyticsResult] = None  # Cache previous valid result if no motion
 
     def set_zones(self, zones: list):
         """Parse zone definitions into efficient polygon structures."""
@@ -115,6 +120,8 @@ class AnalyticsEngine:
         for v in self.zone_crossed_objects.values():
             v.clear()
         self.detector.reset_tracker()
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=False)
+        self.last_result = None
 
     def process_frame(self, frame: np.ndarray, scale: float = 1.0) -> AnalyticsResult:
         """
@@ -124,6 +131,24 @@ class AnalyticsEngine:
         """
         h, w = frame.shape[:2]
 
+        # 1. Motion Detection Stage
+        # Resize frame for faster motion detection (MOG2 is CPU bound)
+        small_frame = cv2.resize(frame, (640, int(640 * (h / w))))
+        fg_mask = self.bg_subtractor.apply(small_frame)
+        
+        # Clean up noise
+        fg_mask = cv2.erode(fg_mask, None, iterations=1)
+        fg_mask = cv2.dilate(fg_mask, None, iterations=2)
+        
+        motion_pixels = cv2.countNonZero(fg_mask)
+        
+        # If no significant motion is detected and we have a previous result, return it
+        if motion_pixels < self.motion_threshold_pixels and self.last_result is not None:
+            # We don't want to count a stationary object multiple times or advance its track history
+            # Just return the visual boxes so the UI doesn't stutter/flicker
+            return self.last_result
+
+        # 2. Object Detection Stage (Only runs if motion is detected)
         # Determine which classes to track
         classes_arg = self._compute_required_classes()
 
@@ -214,12 +239,11 @@ class AnalyticsEngine:
                     "is_counted": track_id in self.crossed_objects,
                 })
 
-        return AnalyticsResult(
-            boxes=boxes_data,
-            total_count=len(self.crossed_objects),
-            zone_counts={z_id: len(tracks) for z_id, tracks in self.zone_crossed_objects.items()},
-            resolution={"w": w, "h": h},
+            "resolution": {"w": w, "h": h},
         )
+        
+        self.last_result = final_result
+        return final_result
 
     def draw_annotations(self, frame: np.ndarray, result: AnalyticsResult):
         """
