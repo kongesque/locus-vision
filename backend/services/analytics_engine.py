@@ -239,8 +239,20 @@ class AnalyticsEngine:
                     "is_counted": track_id in self.crossed_objects,
                 })
 
-            "resolution": {"w": w, "h": h},
-        )
+            final_result = AnalyticsResult(
+                boxes=boxes_data,
+                total_count=len(self.crossed_objects),
+                zone_counts={z_id: len(objs) for z_id, objs in self.zone_crossed_objects.items()},
+                resolution={"w": w, "h": h},
+            )
+        else:
+            # No detections - return empty result
+            final_result = AnalyticsResult(
+                boxes=[],
+                total_count=len(self.crossed_objects),
+                zone_counts={z_id: len(objs) for z_id, objs in self.zone_crossed_objects.items()},
+                resolution={"w": w, "h": h},
+            )
         
         self.last_result = final_result
         return final_result
