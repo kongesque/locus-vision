@@ -100,16 +100,13 @@
 		} else {
 			// --- New Camera Analytics Flow ---
 			try {
-				// TODO: Frontend wire for livestream camera creation was removed because the backend API 
+				// TODO: Frontend wire for livestream camera creation was removed because the backend API
 				// was deleted. Action needs to be manually wired up to a new intended backend if necessary.
-				// 
+				//
 				// Previous code:
 				// const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, { ... });
-				
-				alert('Frontend wire disconnected. See source code.');
-
-				// Redirect to livestream view with WebSocket bounds overlay
-				goto(`/livestream/${taskId}`);
+				// alert('Frontend wire disconnected. See source code.');
+				// goto(`/livestream/${taskId}`);
 			} catch (err) {
 				console.error(err);
 				alert('Camera configuration error: ' + String(err));

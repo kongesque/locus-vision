@@ -34,10 +34,10 @@
 			//
 			// Previous behavior:
 			// const res = await fetch('http://localhost:8000/api/cameras/preview', { ... });
-
-			throw new Error('Preview disconnected: see source code.');
 			// const data = await res.json();
 			// rtspPreview = data.image;
+
+			throw new Error('Preview disconnected: see source code.');
 		} catch (err) {
 			rtspPreviewError = err instanceof Error ? err.message : 'Connection failed';
 		} finally {
@@ -149,21 +149,10 @@
 			//
 			// Previous behavior:
 			// const response = await fetch('http://localhost:8000/api/cameras/', { ... });
+			// videoStore.setVideoType(...)
+			// goto(`/create/${cameraId}`);
 
 			throw new Error('Creation disconnected: see source code.');
-
-			videoStore.setVideoType(activeTab as 'rtsp' | 'stream');
-			if (activeTab === 'rtsp') {
-				videoStore.setVideoUrl(rtspUrl);
-			} else {
-				videoStore.setVideoType('stream');
-				// Save active stream so it plays on the next page
-				videoStore.setVideoStream(localStream);
-				connectionSuccess = true; // prevent the stream from closing when dialog hides
-			}
-
-			open = false;
-			goto(`/create/${cameraId}`);
 		} catch (err) {
 			console.error(err);
 			alert('Failed to connect camera: ' + (err instanceof Error ? err.message : String(err)));
