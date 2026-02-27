@@ -12,9 +12,9 @@
 		thumbnail?: string;
 	}
 
-	let { initialGridCols = 3 }: { initialGridCols?: number } = $props();
+	let props: { initialGridCols?: number } = $props();
 
-	let gridCols = $state(initialGridCols);
+	let gridCols = $state(props.initialGridCols ?? 3);
 
 	let isFullscreen = $state(false);
 	let cameras: Camera[] = $state([]);
