@@ -1,7 +1,7 @@
 """
 Shared analytics engine for zone-based object counting and tracking.
 
-Used by both video processing (offline) and livestream (real-time WebSocket).
+Used by video processing (offline).
 Wraps the ONNX detector and adds stateful zone-aware counting logic.
 """
 
@@ -260,7 +260,7 @@ class AnalyticsEngine:
     def draw_annotations(self, frame: np.ndarray, result: AnalyticsResult):
         """
         Draw bounding boxes, labels, zones, and count overlay on a frame.
-        Matches the same visual style as the livestream canvas overlay.
+        Matches the frontend visual style.
         """
         # Draw zone polygons and lines (dashed-style)
         for zone in self.parsed_zones:

@@ -69,19 +69,6 @@ async def init_db():
                 error_message TEXT    NULL
             );
 
-            CREATE TABLE IF NOT EXISTS cameras (
-                id          TEXT    PRIMARY KEY,
-                name        TEXT    NOT NULL,
-                url         TEXT    NULL,     -- RTSP URL or WebRTC stream ID
-                device_id   TEXT    NULL,     -- Webcam device ID if applicable
-                type        TEXT    NOT NULL DEFAULT 'rtsp', -- 'rtsp' or 'webcam'
-                status      TEXT    NOT NULL DEFAULT 'idle', -- 'idle', 'processing', 'failed'
-                zones       TEXT    NULL,     -- JSON array of zones
-                model_name  TEXT    NULL,     -- YOLO model name
-                classes     TEXT    NULL,     -- JSON array of classes
-                created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-                updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-            );
         """)
         await db.commit()
 

@@ -372,12 +372,11 @@ async def get_storage_stats(admin: dict = Depends(_require_admin)):
 
 @router.delete("/api/admin/media", response_model=MessageResponse)
 async def delete_all_media(admin: dict = Depends(_require_admin)):
-    """Admin only: Delete all video tasks, cameras, and physical media files."""
+    """Admin only: Delete all video tasks and physical media files."""
     db = await get_db()
     try:
         # 1. Clear database tables
         await db.execute("DELETE FROM video_tasks")
-        await db.execute("DELETE FROM cameras")
         await db.commit()
 
         # 2. Clear physical files in data/videos
