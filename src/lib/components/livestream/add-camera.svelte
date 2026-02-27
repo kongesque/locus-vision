@@ -37,7 +37,9 @@
 			// const data = await res.json();
 			// rtspPreview = data.image;
 
-			throw new Error('Preview disconnected: see source code.');
+			// Mock a successful test connection
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			rtspPreview = '/locus.png';
 		} catch (err) {
 			rtspPreviewError = err instanceof Error ? err.message : 'Connection failed';
 		} finally {
@@ -149,10 +151,19 @@
 			//
 			// Previous behavior:
 			// const response = await fetch('http://localhost:8000/api/cameras/', { ... });
-			// videoStore.setVideoType(...)
-			// goto(`/create/${cameraId}`);
 
-			throw new Error('Creation disconnected: see source code.');
+			// Mock successful creation
+			videoStore.setVideoType(activeTab as 'rtsp' | 'stream');
+			if (activeTab === 'rtsp') {
+				videoStore.setVideoUrl(rtspUrl);
+			} else {
+				videoStore.setVideoType('stream');
+				videoStore.setVideoStream(localStream);
+				connectionSuccess = true;
+			}
+
+			open = false;
+			goto(`/create/${cameraId}`);
 		} catch (err) {
 			console.error(err);
 			alert('Failed to connect camera: ' + (err instanceof Error ? err.message : String(err)));

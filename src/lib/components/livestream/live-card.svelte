@@ -81,8 +81,8 @@
 	};
 </script>
 
-<!-- TODO: Link to `/livestream/${cameraId}` removed because livestream API is disconnected. -->
-<div class="group block w-full">
+<!-- Mock link to UI -->
+<a href={`/livestream/${cameraId}`} class="group block w-full">
 	<!-- Thumbnail container with CCTV overlay -->
 	<div
 		class="relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 group-hover:rounded-none"
@@ -145,4 +145,4 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</a>

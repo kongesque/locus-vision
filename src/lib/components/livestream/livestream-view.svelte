@@ -38,13 +38,12 @@
 	}
 
 	onMount(() => {
-		// TODO: Fetching cameras on mount wire disconnected
-		// The backend cameras listing functionality has been deleted. Resolving to empty.
-		//
-		// Previous behavior:
-		// fetch('http://localhost:8000/api/cameras/').then(...)
-
-		cameras = [];
+		// Mock cameras to show the UI
+		cameras = [
+			{ id: 'cam-1', name: 'Front Entrance', status: 'live', thumbnail: '/locus.png' },
+			{ id: 'cam-2', name: 'Backyard', status: 'live', thumbnail: '/locus.png' },
+			{ id: 'cam-3', name: 'Garage', status: 'offline', thumbnail: '/locus.png' }
+		];
 	});
 
 	const toggleFullscreen = () => {

@@ -39,10 +39,10 @@
 					<Sidebar.MenuButton>
 						{#snippet child({ props })}
 							<!-- TODO: Re-wire Livestream Page Link -->
-							<button onclick={() => alert('Livestream page disabled')} {...props}>
+							<a href="/livestream" {...props}>
 								<Radio />
 								<span>Live Stream</span>
-							</button>
+							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>

@@ -106,7 +106,10 @@
 				// Previous code:
 				// const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, { ... });
 				// alert('Frontend wire disconnected. See source code.');
-				// goto(`/livestream/${taskId}`);
+
+				// Mock a successful saving delay and redirect for UI interaction
+				await new Promise((resolve) => setTimeout(resolve, 800));
+				goto(`/livestream/${taskId}`);
 			} catch (err) {
 				console.error(err);
 				alert('Camera configuration error: ' + String(err));
