@@ -364,18 +364,22 @@
 				onmousemove={handleVideoMouseMove}
 				onmouseleave={handleVideoMouseLeave}
 			>
-				<!-- TODO: Connect to actual video stream -->
-				<!-- Placeholder: dark gradient simulating a camera feed -->
-				<div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900">
-					<div class="absolute inset-0 bg-[url('/locus.png')] bg-cover bg-center opacity-30"></div>
-					<!-- Scanline effect -->
-					<div
-						class="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]"
-					></div>
-				</div>
+				<div class="relative aspect-video w-full" style="max-height: 100%;">
+					<!-- TODO: Connect to actual video stream -->
+					<!-- Placeholder: dark gradient simulating a camera feed -->
+					<div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900">
+						<div
+							class="absolute inset-0 bg-[url('/locus.png')] bg-contain bg-center bg-no-repeat opacity-30"
+						></div>
+						<!-- Scanline effect -->
+						<div
+							class="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]"
+						></div>
+					</div>
 
-				<!-- Canvas overlay for detection boxes -->
-				<canvas class="pointer-events-none absolute inset-0 size-full"></canvas>
+					<!-- Canvas overlay for detection boxes -->
+					<canvas class="pointer-events-none absolute inset-0 size-full"></canvas>
+				</div>
 
 				<!-- ─── HUD Overlay (always visible) ─── -->
 				<!-- Top left: Camera info -->
