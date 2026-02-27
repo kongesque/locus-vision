@@ -85,8 +85,12 @@
 		}
 
 		if (isHlsUrl(url)) {
-			// Route through our backend proxy to bypass CORS
-			const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(url)}`;
+			// TODO: HLS proxy route disconnected
+			// The backend proxy `/api/cameras/hls-proxy` was removed.
+			//
+			// Previous behavior:
+			// const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(url)}`;
+			const proxyUrl = '';
 
 			if (Hls.isSupported()) {
 				hlsInstance = new Hls({
@@ -184,11 +188,16 @@
 				onloadedmetadata={updateDims}
 				onresize={updateDims}
 			></video>
-		{:else}
+			<!-- TODO: MJPEG Proxy Route disconnected
+			The backend proxy was removed at `/api/cameras/stream/${cameraId}`.
+			
+			Previous code:
+			src={`http://localhost:8000/api/cameras/stream/${cameraId}`}
+			-->
 			<img
 				bind:this={videoRef as any}
-				src={`http://localhost:8000/api/cameras/stream/${cameraId}`}
-				alt="Camera view"
+				src=""
+				alt="Camera view (Disconnected)"
 				class="pointer-events-none max-h-full max-w-full object-contain"
 				onload={updateDims}
 				onresize={updateDims}

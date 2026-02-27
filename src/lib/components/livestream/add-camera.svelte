@@ -29,19 +29,15 @@
 			rtspPreviewError = null;
 			rtspPreview = null;
 
-			const res = await fetch('http://localhost:8000/api/cameras/preview', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url: rtspUrl })
-			});
+			// TODO: Preview connection wire disconnected
+			// The backend camera functionality has been deleted.
+			//
+			// Previous behavior:
+			// const res = await fetch('http://localhost:8000/api/cameras/preview', { ... });
 
-			if (!res.ok) {
-				const err = await res.json();
-				throw new Error(err.detail || 'Connection failed');
-			}
-
-			const data = await res.json();
-			rtspPreview = data.image;
+			throw new Error('Preview disconnected: see source code.');
+			// const data = await res.json();
+			// rtspPreview = data.image;
 		} catch (err) {
 			rtspPreviewError = err instanceof Error ? err.message : 'Connection failed';
 		} finally {
@@ -148,16 +144,13 @@
 				device_id: activeTab === 'webcam' ? selectedDeviceId : null
 			};
 
-			const response = await fetch('http://localhost:8000/api/cameras/', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(config)
-			});
+			// TODO: Camera creation wire disconnected
+			// The backend camera functionality has been deleted.
+			//
+			// Previous behavior:
+			// const response = await fetch('http://localhost:8000/api/cameras/', { ... });
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.detail || 'Failed to create camera');
-			}
+			throw new Error('Creation disconnected: see source code.');
 
 			videoStore.setVideoType(activeTab as 'rtsp' | 'stream');
 			if (activeTab === 'rtsp') {

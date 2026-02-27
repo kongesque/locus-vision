@@ -100,21 +100,13 @@
 		} else {
 			// --- New Camera Analytics Flow ---
 			try {
-				const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						zones: zones,
-						model_name: selectedModel,
-						classes: fullFrameClasses
-					})
-				});
-
-				if (!response.ok) {
-					console.error('Failed to update camera config');
-					alert('Failed to configure camera analytics');
-					return;
-				}
+				// TODO: Frontend wire for livestream camera creation was removed because the backend API 
+				// was deleted. Action needs to be manually wired up to a new intended backend if necessary.
+				// 
+				// Previous code:
+				// const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, { ... });
+				
+				alert('Frontend wire disconnected. See source code.');
 
 				// Redirect to livestream view with WebSocket bounds overlay
 				goto(`/livestream/${taskId}`);

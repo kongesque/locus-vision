@@ -2,7 +2,6 @@
 	import { page } from '$app/stores';
 	import { AspectRatio } from '$lib/components/ui/aspect-ratio';
 	import { videoStore } from '$lib/stores/video.svelte';
-	import Hls from 'hls.js';
 
 	const taskId = $derived($page.params.taskId);
 
@@ -33,38 +32,27 @@
 		].slice(0, 50); // Keep last 50
 	}
 
-	function isHlsUrl(src: string): boolean {
-		return src.includes('.m3u8') || src.includes('manifest') || src.includes('hls');
-	}
-
 	// Action for initializing the camera feed
 	function videoAction(node: HTMLVideoElement) {
 		let isDestroyed = false;
-		let hlsInstance: Hls | null = null;
 
 		const initVideo = async () => {
 			try {
-				const res = await fetch(`http://localhost:8000/api/cameras/${taskId}`);
-				if (!res.ok) throw new Error('Camera not found');
+				// TODO: Fetch single camera info from backend disconnected
+				// The backend fetching API for individual cameras has been deleted.
+				//
+				// Previous behavior:
+				// const res = await fetch(`http://localhost:8000/api/cameras/${taskId}`);
+				throw new Error('Single camera detail disconnected: see source code');
 
-				const camera = await res.json();
-				cameraName = camera.name;
-				cameraType = camera.type;
-				cameraUrl = camera.url || '';
-				modelName = camera.model_name || 'yolo11n';
-				zones = camera.zones || [];
-
-				if (camera.type === 'webcam') {
+				if (cameraType === 'webcam') {
 					if (videoStore.videoStream) {
 						node.srcObject = videoStore.videoStream;
 						cameraStatus = 'live';
 					} else {
 						try {
 							const stream = await navigator.mediaDevices.getUserMedia({
-								video:
-									camera.device_id && camera.device_id !== 'default'
-										? { deviceId: { exact: camera.device_id } }
-										: true
+								video: true
 							});
 							videoStore.setVideoStream(stream);
 							videoStore.setVideoType('stream');
@@ -76,48 +64,9 @@
 							cameraStatus = 'error';
 						}
 					}
-				} else if (camera.type === 'rtsp' && camera.url) {
-					// Play HLS/RTSP stream in the <video> element natively
-					if (isHlsUrl(camera.url)) {
-						const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(camera.url)}`;
-
-						if (Hls.isSupported()) {
-							hlsInstance = new Hls({
-								lowLatencyMode: true,
-								enableWorker: true,
-								backBufferLength: 0,
-								maxBufferLength: 2,
-								maxMaxBufferLength: 4,
-								liveSyncDurationCount: 1,
-								liveMaxLatencyDurationCount: 3,
-								liveDurationInfinity: true,
-								maxBufferSize: 0,
-								startFragPrefetch: true
-							});
-							hlsInstance.loadSource(proxyUrl);
-							hlsInstance.attachMedia(node);
-							hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-								cameraStatus = 'live';
-								node.play().catch(() => {});
-							});
-							hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
-								if (data.fatal) {
-									console.error('HLS error:', data);
-									errorMsg = `Stream error: ${data.details}`;
-									cameraStatus = 'error';
-								}
-							});
-						} else if (node.canPlayType('application/vnd.apple.mpegurl')) {
-							node.src = proxyUrl;
-							node.addEventListener('loadedmetadata', () => {
-								cameraStatus = 'live';
-								node.play().catch(() => {});
-							});
-						}
-					} else {
-						// True RTSP (not HLS proxyable natively via <video>). Relies on MJPEG route.
-						cameraStatus = 'live';
-					}
+				} else if (cameraType === 'rtsp' && cameraUrl) {
+					// RTSP relies on MJPEG route.
+					cameraStatus = 'live';
 				}
 			} catch (err) {
 				if (isDestroyed) return;
@@ -132,17 +81,23 @@
 		return {
 			destroy() {
 				isDestroyed = true;
-				if (hlsInstance) {
-					hlsInstance.destroy();
-					hlsInstance = null;
-				}
 			}
 		};
 	}
 
 	// Action for Canvas Overlay (WebSocket + frame relay for webcam / listen-only for RTSP)
 	function overlayAction(node: HTMLCanvasElement) {
-		const ws = new WebSocket(`ws://localhost:8000/api/cameras/${taskId}/ws`);
+		// TODO: Analytics WebSocket disconnected
+		// The backend websocket `ws://localhost:8000/api/cameras/${taskId}/ws` was removed.
+		// WebSocket object creation string should simply use a no-op endpoint or be entirely removed.
+		const ws = {
+			onopen: () => {},
+			onmessage: (e: any) => {},
+			onclose: () => {},
+			close: () => {},
+			readyState: 0,
+			send: (b: any) => {}
+		} as unknown as WebSocket;
 		let resizeObserver: ResizeObserver | null = null;
 		let captureInterval: ReturnType<typeof setInterval> | null = null;
 		let videoEl: HTMLVideoElement | null = null;
@@ -174,7 +129,7 @@
 			}
 
 			captureInterval = setInterval(() => {
-				// Only send frames for webcam. RTSP and HLS are processed continuously in the background backend.
+				// Only send frames for webcam. RTSP is processed continuously in the background backend.
 				if (cameraType !== 'webcam') return;
 
 				if (!videoEl || videoEl.readyState < 2 || ws.readyState !== WebSocket.OPEN) return;
@@ -382,27 +337,18 @@
 		<div class="mx-auto flex w-full max-w-5xl flex-col gap-4">
 			<div class="relative overflow-hidden rounded-lg border bg-black shadow-lg">
 				<AspectRatio ratio={16 / 9} class="group relative max-h-[80vh]">
-					{#if cameraType === 'rtsp' && !isHlsUrl(cameraUrl)}
-						<!-- True RTSP (without HLS) falls back to the MJPEG feed -->
-						<img
-							src={`http://localhost:8000/api/cameras/stream/${taskId}`}
-							alt="Live Stream"
-							class="h-full w-full object-contain"
-							crossorigin="anonymous"
-						/>
-					{:else}
-						<!-- HLS natively decodes in <video> -->
-						<!-- svelte-ignore a11y_media_has_caption -->
-						<video
-							use:videoAction
-							class="h-full w-full object-contain"
-							autoplay
-							playsinline
-							muted
-							crossorigin="anonymous"
-						></video>
-					{/if}
-
+					<!-- TODO: MJPEG Proxy Route disconnected
+						The backend MJPEG proxy was removed at `/api/cameras/stream`. 
+						
+						Previous code:
+						src={`http://localhost:8000/api/cameras/stream/${taskId}`}
+						-->
+					<img
+						src=""
+						alt="Live Stream (Disconnected)"
+						class="h-full w-full object-contain"
+						crossorigin="anonymous"
+					/>
 					<canvas use:overlayAction class="pointer-events-none absolute top-0 left-0 h-full w-full"
 					></canvas>
 				</AspectRatio>

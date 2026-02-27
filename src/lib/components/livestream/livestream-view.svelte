@@ -38,19 +38,13 @@
 	}
 
 	onMount(() => {
-		fetch('http://localhost:8000/api/cameras/')
-			.then((res) => {
-				if (!res.ok) throw new Error('Failed to fetch cameras');
-				return res.json();
-			})
-			.then((data: Camera[]) => {
-				cameras = data.map((cam) => ({
-					...cam,
-					status: cam.status || 'offline',
-					thumbnail: cam.thumbnail || '/locus.png'
-				}));
-			})
-			.catch((err) => console.error('Failed to load cameras:', err));
+		// TODO: Fetching cameras on mount wire disconnected
+		// The backend cameras listing functionality has been deleted. Resolving to empty.
+		//
+		// Previous behavior:
+		// fetch('http://localhost:8000/api/cameras/').then(...)
+
+		cameras = [];
 	});
 
 	const toggleFullscreen = () => {
