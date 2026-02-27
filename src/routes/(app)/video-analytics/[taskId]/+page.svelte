@@ -380,7 +380,9 @@
 	onDestroy(() => {
 		stopPolling();
 		if (controlsTimeout) clearTimeout(controlsTimeout);
-		document.removeEventListener('fullscreenchange', handleFullscreenChange);
+		if (typeof document !== 'undefined') {
+			document.removeEventListener('fullscreenchange', handleFullscreenChange);
+		}
 	});
 
 	// Derived status helpers
@@ -482,122 +484,119 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				bind:this={videoContainer}
-				class="group relative overflow-hidden rounded-xl border border-border/50 bg-black shadow-xl"
+				class="group relative flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-black shadow-xl"
+				style={isFullscreen ? 'height: 100vh;' : 'height: calc(100vh - 18rem); min-height: 24rem;'}
 				onmousemove={handleVideoMouseMove}
 				onmouseleave={handleVideoMouseLeave}
 			>
-				<div class="relative aspect-video">
-					{#if status === 'ready' && videoSrc}
-						<!-- svelte-ignore a11y_media_has_caption -->
-						<video
-							bind:this={videoEl}
-							src={videoSrc}
-							class="size-full object-contain"
-							controls
-							autoplay
-							loop
-							playsinline
-							crossorigin="anonymous"
-							ontimeupdate={() => {
-								if (videoEl) {
-									currentVideoTime = videoEl.currentTime;
-									isPlaying = !videoEl.paused;
-								}
-							}}
-							onloadedmetadata={() => {
-								if (videoEl) videoDuration = videoEl.duration;
-							}}
-							onplay={() => (isPlaying = true)}
-							onpause={() => (isPlaying = false)}
-						></video>
+				{#if status === 'ready' && videoSrc}
+					<!-- svelte-ignore a11y_media_has_caption -->
+					<video
+						bind:this={videoEl}
+						src={videoSrc}
+						class="size-full object-contain"
+						controls
+						autoplay
+						loop
+						playsinline
+						crossorigin="anonymous"
+						ontimeupdate={() => {
+							if (videoEl) {
+								currentVideoTime = videoEl.currentTime;
+								isPlaying = !videoEl.paused;
+							}
+						}}
+						onloadedmetadata={() => {
+							if (videoEl) videoDuration = videoEl.duration;
+						}}
+						onplay={() => (isPlaying = true)}
+						onpause={() => (isPlaying = false)}
+					></video>
 
-						<!-- HUD overlay - top left: filename -->
-						<div class="pointer-events-none absolute top-3 left-3 z-10">
-							<span
-								class="font-mono text-[11px] font-medium tracking-wider text-white/50 uppercase"
+					<!-- HUD overlay - top left: filename -->
+					<div class="pointer-events-none absolute top-3 left-3 z-10">
+						<span class="font-mono text-[11px] font-medium tracking-wider text-white/50 uppercase">
+							{task?.filename || 'Video'}
+						</span>
+					</div>
+
+					<!-- HUD overlay - top right: model -->
+					<div class="pointer-events-none absolute top-3 right-3 z-10">
+						<span class="font-mono text-[10px] text-white/40">
+							{task?.model_name || 'yolo11n'} · 12fps
+						</span>
+					</div>
+
+					<!-- ─── Bottom Control Bar Overlay (shown on hover) ─── -->
+					<div
+						class="absolute right-0 bottom-0 left-0 z-20 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pt-10 pb-3 transition-all duration-300 {showControls ||
+						isFullscreen
+							? 'translate-y-0 opacity-100'
+							: 'translate-y-2 opacity-0'}"
+					>
+						<div class="flex items-center gap-3">
+							<button
+								onclick={togglePlayPause}
+								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 							>
-								{task?.filename || 'Video'}
+								{#if isPlaying}
+									<Pause class="size-4" />
+								{:else}
+									<Play class="size-4" />
+								{/if}
+							</button>
+							<span class="font-mono text-xs text-white/60">
+								{formatTime(currentVideoTime)} / {formatTime(videoDuration)}
 							</span>
 						</div>
-
-						<!-- HUD overlay - top right: model -->
-						<div class="pointer-events-none absolute top-3 right-3 z-10">
-							<span class="font-mono text-[10px] text-white/40">
-								{task?.model_name || 'yolo11n'} · 12fps
-							</span>
-						</div>
-
-						<!-- ─── Bottom Control Bar Overlay (shown on hover) ─── -->
-						<div
-							class="absolute right-0 bottom-0 left-0 z-20 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pt-10 pb-3 transition-all duration-300 {showControls ||
-							isFullscreen
-								? 'translate-y-0 opacity-100'
-								: 'translate-y-2 opacity-0'}"
-						>
-							<div class="flex items-center gap-3">
-								<button
-									onclick={togglePlayPause}
-									class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									{#if isPlaying}
-										<Pause class="size-4" />
-									{:else}
-										<Play class="size-4" />
-									{/if}
-								</button>
-								<span class="font-mono text-xs text-white/60">
-									{formatTime(currentVideoTime)} / {formatTime(videoDuration)}
-								</span>
-							</div>
-							<div class="flex items-center gap-1">
-								<button
-									onclick={toggleFullscreen}
-									class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									{#if isFullscreen}
-										<Minimize class="size-4" />
-									{:else}
-										<Maximize class="size-4" />
-									{/if}
-								</button>
-							</div>
-						</div>
-					{:else if status === 'processing' || status === 'loading'}
-						<div
-							class="flex size-full flex-col items-center justify-center gap-4 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"
-						>
-							<div class="relative">
-								<Loader2 class="size-10 animate-spin text-blue-400" />
-								{#if taskProgress > 0}
-									<div class="absolute -bottom-6 left-1/2 -translate-x-1/2">
-										<span class="font-mono text-lg font-bold text-white">{taskProgress}%</span>
-									</div>
+						<div class="flex items-center gap-1">
+							<button
+								onclick={toggleFullscreen}
+								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							>
+								{#if isFullscreen}
+									<Minimize class="size-4" />
+								{:else}
+									<Maximize class="size-4" />
 								{/if}
-							</div>
-							<div class="mt-4 flex flex-col items-center gap-2">
-								<p class="text-sm font-medium text-white/70">Processing video analysis...</p>
-								{#if taskProgress > 0}
-									<div class="h-1.5 w-56 overflow-hidden rounded-full bg-white/10">
-										<div
-											class="h-full rounded-full bg-blue-500 transition-all duration-700 ease-out"
-											style="width: {taskProgress}%"
-										></div>
-									</div>
-								{/if}
-								<p class="mt-1 text-xs text-white/40">
-									This typically takes 10–30 seconds depending on video length.
-								</p>
-							</div>
+							</button>
 						</div>
-					{:else if status === 'error'}
-						<div
-							class="flex size-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"
-						>
-							<AlertTriangle class="size-8 text-red-400/60" />
-							<p class="text-sm text-white/50">Analysis failed</p>
+					</div>
+				{:else if status === 'processing' || status === 'loading'}
+					<div
+						class="absolute inset-0 flex size-full flex-col items-center justify-center gap-4 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"
+					>
+						<div class="relative">
+							<Loader2 class="size-10 animate-spin text-blue-400" />
+							{#if taskProgress > 0}
+								<div class="absolute -bottom-6 left-1/2 -translate-x-1/2">
+									<span class="font-mono text-lg font-bold text-white">{taskProgress}%</span>
+								</div>
+							{/if}
 						</div>
-					{/if}
-				</div>
+						<div class="mt-4 flex flex-col items-center gap-2">
+							<p class="text-sm font-medium text-white/70">Processing video analysis...</p>
+							{#if taskProgress > 0}
+								<div class="h-1.5 w-56 overflow-hidden rounded-full bg-white/10">
+									<div
+										class="h-full rounded-full bg-blue-500 transition-all duration-700 ease-out"
+										style="width: {taskProgress}%"
+									></div>
+								</div>
+							{/if}
+							<p class="mt-1 text-xs text-white/40">
+								This typically takes 10–30 seconds depending on video length.
+							</p>
+						</div>
+					</div>
+				{:else if status === 'error'}
+					<div
+						class="absolute inset-0 flex size-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"
+					>
+						<AlertTriangle class="size-8 text-red-400/60" />
+						<p class="text-sm text-white/50">Analysis failed</p>
+					</div>
+				{/if}
 			</div>
 
 			<!-- ─── Activity Timeline ─── -->

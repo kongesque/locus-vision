@@ -239,7 +239,9 @@
 		if (mockInterval) clearInterval(mockInterval);
 		if (clockInterval) clearInterval(clockInterval);
 		if (controlsTimeout) clearTimeout(controlsTimeout);
-		document.removeEventListener('fullscreenchange', handleFullscreenChange);
+		if (typeof document !== 'undefined') {
+			document.removeEventListener('fullscreenchange', handleFullscreenChange);
+		}
 	});
 
 	// ─── Formatted time for HUD ───
@@ -357,197 +359,192 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				bind:this={videoContainer}
-				class="group relative overflow-hidden rounded-xl border border-border/50 bg-black shadow-xl"
+				class="group relative flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-black shadow-xl"
+				style={isFullscreen ? 'height: 100vh;' : 'height: calc(100vh - 18rem); min-height: 24rem;'}
 				onmousemove={handleVideoMouseMove}
 				onmouseleave={handleVideoMouseLeave}
 			>
-				<div class="relative aspect-video">
-					<!-- TODO: Connect to actual video stream -->
-					<!-- Placeholder: dark gradient simulating a camera feed -->
-					<div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900">
-						<div
-							class="absolute inset-0 bg-[url('/locus.png')] bg-cover bg-center opacity-30"
-						></div>
-						<!-- Scanline effect -->
-						<div
-							class="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]"
-						></div>
-					</div>
-
-					<!-- Canvas overlay for detection boxes -->
-					<canvas class="pointer-events-none absolute inset-0 size-full"></canvas>
-
-					<!-- ─── HUD Overlay (always visible) ─── -->
-					<!-- Top left: Camera info -->
-					<div class="absolute top-3 left-3 z-10 flex flex-col gap-1">
-						<div class="flex items-center gap-2">
-							<span
-								class="font-mono text-[11px] font-medium tracking-wider text-white/60 uppercase"
-							>
-								{cameraName}
-							</span>
-						</div>
-						<span class="font-mono text-[10px] text-white/40">
-							{hudDate}
-							{hudTime}
-						</span>
-					</div>
-
-					<!-- Top right: recording dot -->
-					{#if isRecording}
-						<div class="absolute top-3 right-3 z-10 flex items-center gap-1.5">
-							<span class="size-2 animate-pulse rounded-full bg-red-500"></span>
-							<span class="font-mono text-[10px] font-bold text-red-400/80">REC</span>
-						</div>
-					{/if}
-
-					<!-- Bottom left: model + FPS -->
-					<div class="absolute bottom-3 left-3 z-10">
-						<span class="font-mono text-[10px] text-white/40">
-							{modelName} · {fps}fps · {resolution}
-						</span>
-					</div>
-
-					<!-- ─── PTZ Controls (top-right, shown on hover) ─── -->
+				<!-- TODO: Connect to actual video stream -->
+				<!-- Placeholder: dark gradient simulating a camera feed -->
+				<div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900">
+					<div class="absolute inset-0 bg-[url('/locus.png')] bg-cover bg-center opacity-30"></div>
+					<!-- Scanline effect -->
 					<div
-						class="absolute top-12 right-3 z-20 transition-all duration-300"
-						class:opacity-0={!showPTZ}
-						class:pointer-events-none={!showPTZ}
-						class:opacity-100={showPTZ}
-					>
-						<div
-							class="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-black/70 p-2 backdrop-blur-md"
-						>
-							<button
-								onclick={() => handlePTZ('up')}
-								class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-							>
-								<ChevronUp class="size-4" />
-							</button>
-							<div class="flex items-center gap-1">
-								<button
-									onclick={() => handlePTZ('left')}
-									class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									<MoveLeft class="size-4" />
-								</button>
-								<button
-									onclick={() => handlePTZ('home')}
-									class="flex size-7 items-center justify-center rounded-full border border-white/20 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									<RotateCcw class="size-3" />
-								</button>
-								<button
-									onclick={() => handlePTZ('right')}
-									class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									<MoveRight class="size-4" />
-								</button>
-							</div>
-							<button
-								onclick={() => handlePTZ('down')}
-								class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-							>
-								<ChevronDown class="size-4" />
-							</button>
-							<div class="mt-1 flex items-center gap-1 border-t border-white/10 pt-2">
-								<button
-									onclick={() => handlePTZ('zoom-out')}
-									class="flex size-7 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									<ZoomOut class="size-3.5" />
-								</button>
-								<button
-									onclick={() => handlePTZ('zoom-in')}
-									class="flex size-7 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-								>
-									<ZoomIn class="size-3.5" />
-								</button>
-							</div>
-						</div>
-					</div>
-
-					<!-- ─── Bottom Control Bar (shown on hover) ─── -->
-					<div
-						class="absolute right-0 bottom-0 left-0 z-20 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pt-10 pb-3 transition-all duration-300"
-						class:opacity-0={!showControls && !isFullscreen}
-						class:translate-y-2={!showControls && !isFullscreen}
-						class:opacity-100={showControls || isFullscreen}
-						class:translate-y-0={showControls || isFullscreen}
-					>
-						<div class="flex items-center gap-1">
-							<button
-								onclick={handleSnapshot}
-								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-								title="Capture Snapshot"
-							>
-								<Camera class="size-4" />
-								<span class="hidden sm:inline">Snapshot</span>
-							</button>
-							<button
-								onclick={handleRecordToggle}
-								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 {isRecording
-									? 'text-red-400'
-									: 'text-white/80'}"
-								title={isRecording ? 'Stop Recording' : 'Start Recording'}
-							>
-								{#if isRecording}
-									<Circle class="size-4 fill-red-500" />
-								{:else}
-									<Video class="size-4" />
-								{/if}
-								<span class="hidden sm:inline">{isRecording ? 'Recording' : 'Record'}</span>
-							</button>
-							<button
-								onclick={handleMuteToggle}
-								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-								title={isMuted ? 'Unmute' : 'Mute'}
-							>
-								{#if isMuted}
-									<VolumeOff class="size-4" />
-								{:else}
-									<Volume2 class="size-4" />
-								{/if}
-							</button>
-						</div>
-						<div class="flex items-center gap-1">
-							<button
-								onclick={() => (showPTZ = !showPTZ)}
-								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 {showPTZ
-									? 'text-blue-400'
-									: 'text-white/80'}"
-								title="Toggle PTZ Controls"
-							>
-								<Crosshair class="size-4" />
-								<span class="hidden sm:inline">PTZ</span>
-							</button>
-							<button
-								onclick={toggleFullscreen}
-								class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-								title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-							>
-								{#if isFullscreen}
-									<Minimize class="size-4" />
-								{:else}
-									<Maximize class="size-4" />
-								{/if}
-							</button>
-						</div>
-					</div>
-
-					<!-- ─── Count Badge (top center) ─── -->
-					{#if trackCount > 0}
-						<div class="absolute top-3 left-1/2 z-10 -translate-x-1/2">
-							<div
-								class="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-3 py-1 backdrop-blur-sm"
-							>
-								<Eye class="size-3 text-blue-400" />
-								<span class="font-mono text-xs font-bold text-white">{trackCount}</span>
-								<span class="text-[10px] text-white/50">tracked</span>
-							</div>
-						</div>
-					{/if}
+						class="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]"
+					></div>
 				</div>
+
+				<!-- Canvas overlay for detection boxes -->
+				<canvas class="pointer-events-none absolute inset-0 size-full"></canvas>
+
+				<!-- ─── HUD Overlay (always visible) ─── -->
+				<!-- Top left: Camera info -->
+				<div class="pointer-events-none absolute top-3 left-3 z-10 flex flex-col gap-1">
+					<div class="flex items-center gap-2">
+						<span class="font-mono text-[11px] font-medium tracking-wider text-white/60 uppercase">
+							{cameraName}
+						</span>
+					</div>
+					<span class="font-mono text-[10px] text-white/40">
+						{hudDate}
+						{hudTime}
+					</span>
+				</div>
+
+				<!-- Top right: recording dot -->
+				{#if isRecording}
+					<div class="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+						<span class="size-2 animate-pulse rounded-full bg-red-500"></span>
+						<span class="font-mono text-[10px] font-bold text-red-400/80">REC</span>
+					</div>
+				{/if}
+
+				<!-- Bottom left: model + FPS -->
+				<div class="absolute bottom-3 left-3 z-10">
+					<span class="font-mono text-[10px] text-white/40">
+						{modelName} · {fps}fps · {resolution}
+					</span>
+				</div>
+
+				<!-- ─── PTZ Controls (top-right, shown on hover) ─── -->
+				<div
+					class="absolute top-12 right-3 z-20 transition-all duration-300"
+					class:opacity-0={!showPTZ}
+					class:pointer-events-none={!showPTZ}
+					class:opacity-100={showPTZ}
+				>
+					<div
+						class="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-black/70 p-2 backdrop-blur-md"
+					>
+						<button
+							onclick={() => handlePTZ('up')}
+							class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+						>
+							<ChevronUp class="size-4" />
+						</button>
+						<div class="flex items-center gap-1">
+							<button
+								onclick={() => handlePTZ('left')}
+								class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+							>
+								<MoveLeft class="size-4" />
+							</button>
+							<button
+								onclick={() => handlePTZ('home')}
+								class="flex size-7 items-center justify-center rounded-full border border-white/20 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+							>
+								<RotateCcw class="size-3" />
+							</button>
+							<button
+								onclick={() => handlePTZ('right')}
+								class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+							>
+								<MoveRight class="size-4" />
+							</button>
+						</div>
+						<button
+							onclick={() => handlePTZ('down')}
+							class="flex size-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+						>
+							<ChevronDown class="size-4" />
+						</button>
+						<div class="mt-1 flex items-center gap-1 border-t border-white/10 pt-2">
+							<button
+								onclick={() => handlePTZ('zoom-out')}
+								class="flex size-7 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+							>
+								<ZoomOut class="size-3.5" />
+							</button>
+							<button
+								onclick={() => handlePTZ('zoom-in')}
+								class="flex size-7 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+							>
+								<ZoomIn class="size-3.5" />
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- ─── Bottom Control Bar (shown on hover) ─── -->
+				<div
+					class="absolute right-0 bottom-0 left-0 z-20 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pt-10 pb-3 transition-all duration-300"
+					class:opacity-0={!showControls && !isFullscreen}
+					class:translate-y-2={!showControls && !isFullscreen}
+					class:opacity-100={showControls || isFullscreen}
+					class:translate-y-0={showControls || isFullscreen}
+				>
+					<div class="flex items-center gap-1">
+						<button
+							onclick={handleSnapshot}
+							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							title="Capture Snapshot"
+						>
+							<Camera class="size-4" />
+							<span class="hidden sm:inline">Snapshot</span>
+						</button>
+						<button
+							onclick={handleRecordToggle}
+							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 {isRecording
+								? 'text-red-400'
+								: 'text-white/80'}"
+							title={isRecording ? 'Stop Recording' : 'Start Recording'}
+						>
+							{#if isRecording}
+								<Circle class="size-4 fill-red-500" />
+							{:else}
+								<Video class="size-4" />
+							{/if}
+							<span class="hidden sm:inline">{isRecording ? 'Recording' : 'Record'}</span>
+						</button>
+						<button
+							onclick={handleMuteToggle}
+							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							title={isMuted ? 'Unmute' : 'Mute'}
+						>
+							{#if isMuted}
+								<VolumeOff class="size-4" />
+							{:else}
+								<Volume2 class="size-4" />
+							{/if}
+						</button>
+					</div>
+					<div class="flex items-center gap-1">
+						<button
+							onclick={() => (showPTZ = !showPTZ)}
+							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 {showPTZ
+								? 'text-blue-400'
+								: 'text-white/80'}"
+							title="Toggle PTZ Controls"
+						>
+							<Crosshair class="size-4" />
+							<span class="hidden sm:inline">PTZ</span>
+						</button>
+						<button
+							onclick={toggleFullscreen}
+							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+						>
+							{#if isFullscreen}
+								<Minimize class="size-4" />
+							{:else}
+								<Maximize class="size-4" />
+							{/if}
+						</button>
+					</div>
+				</div>
+
+				<!-- ─── Count Badge (top center) ─── -->
+				{#if trackCount > 0}
+					<div class="absolute top-3 left-1/2 z-10 -translate-x-1/2">
+						<div
+							class="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-3 py-1 backdrop-blur-sm"
+						>
+							<Eye class="size-3 text-blue-400" />
+							<span class="font-mono text-xs font-bold text-white">{trackCount}</span>
+							<span class="text-[10px] text-white/50">tracked</span>
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<!-- ─── Stats Cards ─── -->
