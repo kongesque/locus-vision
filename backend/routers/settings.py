@@ -377,6 +377,7 @@ async def delete_all_media(admin: dict = Depends(_require_admin)):
     try:
         # 1. Clear database tables
         await db.execute("DELETE FROM video_tasks")
+        await db.execute("DELETE FROM cameras")
         await db.commit()
 
         # 2. Clear physical files in data/videos
