@@ -88,7 +88,7 @@
 		class="relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 group-hover:rounded-none"
 	>
 		<img
-			src={thumbnail}
+			src={`http://localhost:8000/api/livestream/${cameraId}/video`}
 			alt={title}
 			class="aspect-video w-full object-cover transition-opacity duration-300 group-hover:opacity-80"
 		/>

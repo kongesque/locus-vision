@@ -36,30 +36,60 @@
 
 	const taskId = $derived($page.params.taskId);
 
-	// ─── Camera State ───
-	let cameraName = $state('Front Entrance');
-	let cameraStatus = $state<'live' | 'connecting' | 'offline' | 'error'>('live');
+	// ─── Camera State (loaded from backend) ───
+	let cameraName = $state('Loading...');
+	let cameraStatus = $state<'live' | 'connecting' | 'offline' | 'error'>('connecting');
 	let cameraType = $state<'webcam' | 'rtsp'>('rtsp');
-	let cameraUrl = $state('rtsp://192.168.1.64:554/stream1');
+	let cameraUrl = $state('');
 	let modelName = $state('YOLOv11n');
 	let resolution = $state('1920×1080');
 	let fps = $state(24);
 	let bitrate = $state('4.2 Mbps');
 	let errorMsg = $state<string | null>(null);
-	let uptime = $state('02:34:17');
+	let uptime = $state('--:--:--');
 
-	// ─── Detection State ───
-	let zones = $state<any[]>([
-		{ id: 'zone-entrance', color: '#3b82f6', name: 'Entrance', points: [] },
-		{ id: 'zone-parking', color: '#f59e0b', name: 'Parking Lot', points: [] },
-		{ id: 'zone-lobby', color: '#10b981', name: 'Main Lobby', points: [] }
-	]);
-	let trackCount = $state(12);
-	let zoneCounts = $state<Record<string, number>>({
-		'zone-entrance': 5,
-		'zone-parking': 3,
-		'zone-lobby': 4
-	});
+	// ─── Detection State (loaded from backend) ───
+	let zones = $state<any[]>([]);
+	let trackCount = $state(0);
+	let zoneCounts = $state<Record<string, number>>({});
+
+	// Fetch camera details from backend
+	async function fetchCameraInfo() {
+		try {
+			const res = await fetch(`http://localhost:8000/api/cameras/${taskId}`);
+			if (res.ok) {
+				const data = await res.json();
+				cameraName = data.name;
+				cameraType = data.type as 'webcam' | 'rtsp';
+				cameraUrl = data.url || '';
+				modelName = data.model_name || 'YOLOv11n';
+				cameraStatus = 'live';
+
+				// Parse zones if stored as JSON string
+				if (data.zones) {
+					try {
+						const parsedZones =
+							typeof data.zones === 'string' ? JSON.parse(data.zones) : data.zones;
+						zones = parsedZones;
+						// Initialize zone counts from parsed zones
+						const counts: Record<string, number> = {};
+						for (const z of parsedZones) {
+							counts[z.id] = 0;
+						}
+						zoneCounts = counts;
+					} catch {
+						zones = [];
+					}
+				}
+			} else {
+				errorMsg = 'Camera not found';
+				cameraStatus = 'error';
+			}
+		} catch (err) {
+			errorMsg = 'Failed to connect to backend';
+			cameraStatus = 'error';
+		}
+	}
 
 	// ─── UI State ───
 	let isFullscreen = $state(false);
@@ -226,9 +256,7 @@
 
 	// ─── Lifecycle ───
 	onMount(() => {
-		// TODO: Fetch camera info from backend API
-		// GET /api/cameras/{taskId}
-		// Response: { name, type, url, model, status, zones, ... }
+		fetchCameraInfo();
 
 		clockInterval = setInterval(() => {
 			currentTime = new Date();

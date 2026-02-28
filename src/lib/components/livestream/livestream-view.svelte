@@ -19,6 +19,18 @@
 	let isFullscreen = $state(false);
 	let cameras: Camera[] = $state([]);
 	let gridContainer: HTMLDivElement | null = $state(null);
+	let refreshTimer: ReturnType<typeof setInterval>;
+
+	async function fetchCameras() {
+		try {
+			const res = await fetch('http://localhost:8000/api/cameras');
+			if (res.ok) {
+				cameras = await res.json();
+			}
+		} catch {
+			// silent — backend might be down
+		}
+	}
 
 	// Container action to manage fullscreen requests
 	function fullscreenAction(node: HTMLDivElement) {
@@ -38,12 +50,13 @@
 	}
 
 	onMount(() => {
-		// Mock cameras to show the UI
-		cameras = [
-			{ id: 'cam-1', name: 'Front Entrance', status: 'live', thumbnail: '/locus.png' },
-			{ id: 'cam-2', name: 'Backyard', status: 'live', thumbnail: '/locus.png' },
-			{ id: 'cam-3', name: 'Garage', status: 'offline', thumbnail: '/locus.png' }
-		];
+		fetchCameras();
+		refreshTimer = setInterval(fetchCameras, 5000);
+	});
+
+	import { onDestroy } from 'svelte';
+	onDestroy(() => {
+		if (refreshTimer) clearInterval(refreshTimer);
 	});
 
 	const toggleFullscreen = () => {

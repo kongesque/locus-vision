@@ -10,6 +10,7 @@ from routers.auth import router as auth_router
 from routers.settings import router as settings_router
 from routers.video_processing import router as video_router
 from routers.livestream import router as livestream_router
+from routers.cameras import router as cameras_router
 
 import asyncio
 from services.job_queue import job_queue
@@ -51,6 +52,7 @@ app.include_router(auth_router)
 app.include_router(settings_router)
 app.include_router(video_router)
 app.include_router(livestream_router)
+app.include_router(cameras_router)
 
 
 @app.get("/api/health")

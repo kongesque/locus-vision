@@ -69,6 +69,19 @@ async def init_db():
                 error_message TEXT    NULL
             );
 
+            CREATE TABLE IF NOT EXISTS cameras (
+                id          TEXT    PRIMARY KEY,
+                name        TEXT    NOT NULL,
+                type        TEXT    NOT NULL DEFAULT 'rtsp',
+                url         TEXT    NULL,
+                device_id   TEXT    NULL,
+                model_name  TEXT    NOT NULL DEFAULT 'yolo11n',
+                status      TEXT    NOT NULL DEFAULT 'active',
+                zones       TEXT    NULL,
+                classes     TEXT    NULL,
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
         """)
         await db.commit()
 

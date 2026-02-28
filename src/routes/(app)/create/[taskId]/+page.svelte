@@ -98,17 +98,23 @@
 			// Redirect immediately to task result page
 			goto(`/video-analytics/${taskId}`);
 		} else {
-			// --- New Camera Analytics Flow ---
+			// --- Camera Analytics Flow ---
 			try {
-				// TODO: Frontend wire for livestream camera creation was removed because the backend API
-				// was deleted. Action needs to be manually wired up to a new intended backend if necessary.
-				//
-				// Previous code:
-				// const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, { ... });
-				// alert('Frontend wire disconnected. See source code.');
+				const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						zones: JSON.stringify(zones),
+						classes: JSON.stringify(fullFrameClasses),
+						model_name: selectedModel
+					})
+				});
 
-				// Mock a successful saving delay and redirect for UI interaction
-				await new Promise((resolve) => setTimeout(resolve, 800));
+				if (!response.ok) {
+					const errData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+					throw new Error(errData.detail || 'Failed to save camera configuration');
+				}
+
 				goto(`/livestream/${taskId}`);
 			} catch (err) {
 				console.error(err);

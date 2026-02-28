@@ -148,4 +148,36 @@ class VideoTask(BaseModel):
     error_message: str | None = None
 
 
+class CameraCreate(BaseModel):
+    id: str | None = None
+    name: str
+    type: str = "rtsp"
+    url: str | None = None
+    device_id: str | None = None
+    model_name: str = "yolo11n"
+    zones: str | None = None
+    classes: str | None = None
 
+
+class CameraUpdate(BaseModel):
+    name: str | None = None
+    type: str | None = None
+    url: str | None = None
+    device_id: str | None = None
+    model_name: str | None = None
+    status: str | None = None
+    zones: str | None = None
+    classes: str | None = None
+
+
+class CameraResponse(BaseModel):
+    id: str
+    name: str
+    type: str
+    url: str | None = None
+    device_id: str | None = None
+    model_name: str
+    status: str
+    zones: str | None = None
+    classes: str | None = None
+    created_at: str
