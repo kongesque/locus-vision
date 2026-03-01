@@ -26,7 +26,10 @@ It is built to be local-first, privacy-centric, and highly optimized for edge de
 - **Directional Line Crossing** — A/B region virtual lines with mathematically accurate vector cross-product trajectory detection (A↔B, A→B, B→A).
 - **Video Analytics Job Queue** — Robust background job queue system for batch video uploads, sequential processing via a dedicated multiprocessing worker, and real-time progress tracking.
 - **Optimized Background Processing** — OS-level multiprocessing architecture bypassing the Python GIL, coupled with a motion detection pipeline to pre-filter static frames and optimize CPU usage.
-- **Live Stream** — //TODO: Re-integrate backend real-time RTSP/Webcam feeds. The frontend UI currently uses mocked data.
+- **Live Stream** — Real-time backend video streaming (MJPEG) and synchronized Server-Sent Events (SSE) telemetry for dynamic object filtering and event feeds.
+- **Dynamic Activity Feeds** — Actionable UI that automatically maps detected object classes (from backend analytics) into interactive visual filters.
+- **Database Tracking** — Audited backend schema with async SQLite connection management.
+- // TODO: Consider integrating support for secondary RTSP camera streams besides the primary webcam.
 - **Authentication** — JWT-based auth with HttpOnly cookies, auto-refresh
 - **Role-Based Access** — admin and viewer roles
 - **User Management** — admin panel for user CRUD, role assignment, activation
@@ -58,6 +61,8 @@ Locus is under active development. Recent milestones include:
 - **Motion Detection Optimization**: Introduced a pre-filtering motion detection pipeline to drop static frames before running expensive AI object detection, drastically reducing CPU usage.
 - **Advanced Analytics & UI**: Unified annotation drawing across the frontend and backend. Added support for dashed zone borders, semi-transparent zone fills, colored bounding boxes with class labels, and on-screen count overlays.
 - **Directional Crossing Filters**: Enhanced line zones with intersection detection and precise crossing direction selection in both the UI and analytics engine.
+- **Live Video & Telemetry Overhaul**: Redesigned `/video-analytics` and `/livestream` pages, fixed video player CSS scaling rules, integrated SSE for telemetry dashboards, and supported dynamic filtering.
+- **Backend Infrastructure Audit**: Validated schema relationships, async db execution flows, and REST endpoints for maximum code quality.
 - **System & Media Management**: Introduced system storage statistics display, media deletion capabilities, theme mode selection, and complete user account deletion functionalities.
 - **Benchmarking Tools**: Optimizations to the benchmark script to accurately profile AI inference performance and deployment readiness on the Raspberry Pi 5.
 
