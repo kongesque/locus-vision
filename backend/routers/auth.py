@@ -221,7 +221,6 @@ async def login(data: UserLogin, request: Request):
 
         # Store refresh token hash in sessions
         refresh_hash = hash_password(refresh_token)
-        expires_at = datetime.now(timezone.utc).isoformat()
         await db.execute(
             """INSERT INTO sessions (user_id, refresh_token_hash, expires_at)
                VALUES (?, ?, datetime('now', '+7 days'))""",

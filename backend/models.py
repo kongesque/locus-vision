@@ -145,6 +145,8 @@ class VideoTask(BaseModel):
     model_name: str | None = None
     total_count: int | None = None
     zone_counts: str | None = None
+    zones: str | None = None
+    classes: str | None = None
     error_message: str | None = None
 
 
