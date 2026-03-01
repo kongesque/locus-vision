@@ -92,10 +92,9 @@ class StreamContext:
             if result.boxes:
                 events = []
                 for box in result.boxes:
-                    ev_type = "person" if box["class"] == 0 else "vehicle" if box["class"] in [2,3,5,7] else "motion"
                     zone_name = box.get("in_zone", "Camera View") or "Camera View"
                     events.append({
-                        "type": ev_type,
+                        "type": box["label"].lower(),
                         "message": f"{box['label']} detected (Confidence: {box['conf']})",
                         "zone": zone_name,
                         "timestamp": time.time(),

@@ -54,6 +54,7 @@
 
 	// ─── Detection State (loaded from backend) ───
 	let zones = $state<any[]>([]);
+	let detectionClasses = $state<string[]>([]);
 	let trackCount = $state(0);
 	let zoneCounts = $state<Record<string, number>>({});
 
@@ -85,6 +86,16 @@
 						zones = [];
 					}
 				}
+
+				// Parse detection classes
+				if (data.classes) {
+					try {
+						detectionClasses =
+							typeof data.classes === 'string' ? JSON.parse(data.classes) : data.classes;
+					} catch {
+						detectionClasses = [];
+					}
+				}
 			} else {
 				errorMsg = 'Camera not found';
 				cameraStatus = 'error';
@@ -106,7 +117,7 @@
 	let activeEventFilter = $state<string>('all');
 
 	// ─── Activity Log ───
-	type EventType = 'person' | 'vehicle' | 'motion' | 'zone' | 'alert';
+	type EventType = string;
 	interface ActivityEvent {
 		id: string;
 		time: string;
@@ -115,13 +126,35 @@
 		zone?: string;
 	}
 
-	const eventTypeConfig: Record<EventType, { label: string; color: string; bgColor: string }> = {
-		person: { label: 'Person', color: 'text-blue-400', bgColor: 'bg-blue-500/15' },
-		vehicle: { label: 'Vehicle', color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
-		motion: { label: 'Motion', color: 'text-emerald-400', bgColor: 'bg-emerald-500/15' },
-		zone: { label: 'Zone Entry', color: 'text-purple-400', bgColor: 'bg-purple-500/15' },
-		alert: { label: 'Alert', color: 'text-red-400', bgColor: 'bg-red-500/15' }
-	};
+	const PALETTE = [
+		{ color: 'text-blue-400', bgColor: 'bg-blue-500/15' },
+		{ color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
+		{ color: 'text-emerald-400', bgColor: 'bg-emerald-500/15' },
+		{ color: 'text-fuchsia-400', bgColor: 'bg-fuchsia-500/15' },
+		{ color: 'text-cyan-400', bgColor: 'bg-cyan-500/15' },
+		{ color: 'text-rose-400', bgColor: 'bg-rose-500/15' }
+	];
+
+	let eventTypeConfig = $derived.by(() => {
+		const config: Record<string, { label: string; color: string; bgColor: string }> = {
+			zone: { label: 'Zone Entry', color: 'text-purple-400', bgColor: 'bg-purple-500/15' },
+			alert: { label: 'Alert', color: 'text-red-400', bgColor: 'bg-red-500/15' },
+			motion: { label: 'Motion', color: 'text-emerald-400', bgColor: 'bg-emerald-500/15' }
+		};
+
+		if (detectionClasses && detectionClasses.length > 0) {
+			detectionClasses.forEach((cls, idx) => {
+				const c = PALETTE[idx % PALETTE.length];
+				config[cls.toLowerCase()] = { label: cls.charAt(0).toUpperCase() + cls.slice(1), ...c };
+			});
+		} else {
+			// Fallback defaults
+			config['person'] = { label: 'Person', color: 'text-blue-400', bgColor: 'bg-blue-500/15' };
+			config['vehicle'] = { label: 'Vehicle', color: 'text-amber-400', bgColor: 'bg-amber-500/15' };
+		}
+
+		return config;
+	});
 
 	let activityLogs = $state<ActivityEvent[]>([]);
 	let hasActiveAlert = $state(false);
@@ -735,24 +768,29 @@
 					{:else}
 						<ul class="divide-y divide-border/30">
 							{#each filteredLogs as log (log.id)}
+								{@const config = eventTypeConfig[log.type] || {
+									color: 'text-zinc-400',
+									bgColor: 'bg-zinc-500/15'
+								}}
 								<li class="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/20">
 									<!-- Event type indicator -->
 									<div class="mt-0.5 shrink-0">
 										<div
-											class="flex size-6 items-center justify-center rounded-md {eventTypeConfig[
-												log.type
-											].bgColor}"
+											class="flex size-6 items-center justify-center rounded-md {config.bgColor}"
 										>
 											{#if log.type === 'person'}
-												<Users class="size-3 {eventTypeConfig[log.type].color}" />
+												<Users class="size-3 {config.color}" />
 											{:else if log.type === 'vehicle'}
-												<Car class="size-3 {eventTypeConfig[log.type].color}" />
+												<Car class="size-3 {config.color}" />
 											{:else if log.type === 'motion'}
-												<Activity class="size-3 {eventTypeConfig[log.type].color}" />
+												<Activity class="size-3 {config.color}" />
 											{:else if log.type === 'zone'}
-												<Shield class="size-3 {eventTypeConfig[log.type].color}" />
+												<Shield class="size-3 {config.color}" />
+											{:else if log.type === 'alert'}
+												<AlertTriangle class="size-3 {config.color}" />
 											{:else}
-												<AlertTriangle class="size-3 {eventTypeConfig[log.type].color}" />
+												<!-- Generic fallback for arbitrary dynamic YOLO classes -->
+												<Crosshair class="size-3 {config.color}" />
 											{/if}
 										</div>
 									</div>

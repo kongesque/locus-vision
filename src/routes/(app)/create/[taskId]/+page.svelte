@@ -123,12 +123,17 @@
 					}))
 				}));
 
+				// Consolidate classes to ensure Activity Feed shows all selected classes
+				const consolidatedClasses = Array.from(
+					new Set([...fullFrameClasses, ...zones.flatMap((z) => z.classes || [])])
+				);
+
 				const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
 						zones: JSON.stringify(normalizedZones),
-						classes: JSON.stringify(fullFrameClasses),
+						classes: JSON.stringify(consolidatedClasses),
 						model_name: selectedModel
 					})
 				});
