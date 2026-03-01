@@ -42,7 +42,11 @@
 	let cameraType = $state<'webcam' | 'rtsp'>('rtsp');
 	let cameraUrl = $state('');
 	let modelName = $state('YOLOv11n');
-	let resolution = $state('1920×1080');
+	let videoWidth = $state(0);
+	let videoHeight = $state(0);
+	let resolution = $derived(
+		videoWidth && videoHeight ? `${videoWidth}×${videoHeight}` : 'Loading...'
+	);
 	let fps = $state(24);
 	let bitrate = $state('4.2 Mbps');
 	let errorMsg = $state<string | null>(null);
@@ -413,6 +417,8 @@
 								src={`http://localhost:8000/api/livestream/${taskId}/video`}
 								alt="Live Video Feed"
 								class="h-full w-full object-contain"
+								bind:naturalWidth={videoWidth}
+								bind:naturalHeight={videoHeight}
 							/>
 						{:else}
 							<div class="flex flex-col items-center justify-center gap-4 text-zinc-500">
