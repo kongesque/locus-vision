@@ -10,3 +10,4 @@ aiosqlite==0.22.1
 pydantic-settings==2.13.1
 argon2-cffi==25.1.0
 python-jose[cryptography]==3.5.0
+psutil==7.0.0

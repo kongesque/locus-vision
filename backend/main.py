@@ -11,8 +11,11 @@ from routers.settings import router as settings_router
 from routers.video_processing import router as video_router
 from routers.livestream import router as livestream_router
 from routers.cameras import router as cameras_router
+from routers.system import router as system_router
+from routers.metrics import router as metrics_router
 
 from services.job_queue import job_queue
+from services.metrics_collector import metrics_collector
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,10 +25,14 @@ async def lifespan(app: FastAPI):
     # Start the video processing job queue worker
     job_queue.start()
     
+    # Start the metrics collector
+    await metrics_collector.start()
+    
     yield
     
     # Cleanup background workers on shutdown
     job_queue.stop()
+    metrics_collector.stop()
 
 
 app = FastAPI(
@@ -52,6 +59,8 @@ app.include_router(settings_router)
 app.include_router(video_router)
 app.include_router(livestream_router)
 app.include_router(cameras_router)
+app.include_router(system_router)
+app.include_router(metrics_router)
 
 
 @app.get("/api/health")

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { Home, Radio, ScanSearch, Settings, LogOut } from '@lucide/svelte';
+	import { Home, Radio, ScanSearch, Settings, LogOut, Activity } from '@lucide/svelte';
 	import Echo from '$lib/components/svg/echo.svelte';
 </script>
 

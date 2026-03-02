@@ -8,6 +8,7 @@ and supervision for tracking. Drastically reduces the dependency footprint
 
 import os
 import json
+import time
 import numpy as np
 import cv2
 import onnxruntime as ort
@@ -209,9 +210,15 @@ class OnnxDetector:
 
     def detect(self, frame: np.ndarray, classes: list[int] | None = None) -> DetectionResult:
         """Run detection only (no tracking)."""
+        start_time = time.perf_counter()
+        
         blob, ratio, _, pad_w, pad_h = self._preprocess(frame)
         outputs = self.session.run(None, {self.input_name: blob})
         boxes_xyxy, scores, class_ids = self._postprocess(outputs[0], ratio, pad_w, pad_h, classes)
+        
+        # Record inference metrics
+        inference_ms = (time.perf_counter() - start_time) * 1000
+        self._record_metrics(inference_ms, len(boxes_xyxy))
 
         if len(boxes_xyxy) == 0:
             return DetectionResult(np.empty((0, 4)), np.empty(0), np.empty(0, dtype=int))
@@ -222,9 +229,15 @@ class OnnxDetector:
 
     def get_detections(self, frame: np.ndarray, classes: list[int] | None = None) -> sv.Detections:
         """Run detection and return supervision Detections object for upstream tracking."""
+        start_time = time.perf_counter()
+        
         blob, ratio, _, pad_w, pad_h = self._preprocess(frame)
         outputs = self.session.run(None, {self.input_name: blob})
         boxes_xyxy, scores, class_ids = self._postprocess(outputs[0], ratio, pad_w, pad_h, classes)
+        
+        # Record inference metrics
+        inference_ms = (time.perf_counter() - start_time) * 1000
+        self._record_metrics(inference_ms, len(boxes_xyxy))
 
         if len(boxes_xyxy) == 0:
             return sv.Detections.empty()
@@ -244,6 +257,22 @@ class OnnxDetector:
         xywh[:, 2] = boxes[:, 2] - boxes[:, 0]         # w
         xywh[:, 3] = boxes[:, 3] - boxes[:, 1]         # h
         return xywh
+
+    def _record_metrics(self, inference_ms: float, num_detections: int):
+        """Record detection metrics to the global collector."""
+        try:
+            # Import here to avoid circular dependency
+            from services.metrics_collector import metrics_collector
+            # Get model name from cached detectors
+            model_name = "unknown"
+            for name, detector in _detector_cache.items():
+                if detector is self:
+                    model_name = name
+                    break
+            metrics_collector.record_detection(inference_ms, num_detections, model_name)
+        except Exception:
+            # Silently fail - metrics should not break detection
+            pass
 
 
 # ── Model cache (singleton per model name) ───────────────────────

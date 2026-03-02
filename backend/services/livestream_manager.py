@@ -10,6 +10,7 @@ import time
 import json
 import cv2
 from services.analytics_engine import AnalyticsEngine
+from services.metrics_collector import metrics_collector
 
 
 class LivestreamManager:
@@ -44,9 +45,17 @@ class StreamContext:
         
         self._running = False
         self._thread = None
+        
+        # Frame timing metrics for FPS calculation
+        self._frame_count = 0
+        self._frame_times = []
+        self._fps_calc_interval = 5  # Calculate FPS every 5 seconds
+        self._last_fps_calc = time.time()
 
     def start(self):
         self._running = True
+        # Register with metrics collector
+        metrics_collector.register_camera(self.camera_id)
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
 
@@ -54,6 +63,8 @@ class StreamContext:
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
+        # Unregister from metrics collector
+        metrics_collector.unregister_camera(self.camera_id)
 
     def _capture_loop(self):
         cap = cv2.VideoCapture(0)
@@ -65,18 +76,35 @@ class StreamContext:
 
         target_fps = 15
         frame_interval = 1.0 / target_fps
+        
+        # Track frame timing for FPS calculation
+        frame_times = []
+        last_frame_time = time.time()
 
         print(f"[Livestream] Started capture on {self.camera_id}")
         while self._running:
-            start_time = time.time()
+            loop_start = time.time()
             ret, frame = cap.read()
             if not ret:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
+            
+            # Calculate input FPS based on time between frames
+            current_time = time.time()
+            frame_times.append(current_time)
+            # Keep only last 30 frames for FPS calc
+            if len(frame_times) > 30:
+                frame_times.pop(0)
+            if len(frame_times) >= 2:
+                input_fps = len(frame_times) / (frame_times[-1] - frame_times[0])
+                metrics_collector.update_camera_input_fps(self.camera_id, input_fps)
 
             # Process AI with configured zones/classes
             result = self.engine.process_frame(frame)
             self.engine.draw_annotations(frame, result)
+            
+            # Track that a frame was processed
+            self._frame_count += 1
 
             # Encode to JPEG
             ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
@@ -87,6 +115,19 @@ class StreamContext:
                         q.put_nowait(frame_bytes)
                     except asyncio.QueueFull:
                         pass
+                
+                # Record successful frame processing
+                metrics_collector.record_camera_frame(
+                    self.camera_id, 
+                    processed=True,
+                    inference_ms=0  # Inference time is recorded by detector itself
+                )
+            else:
+                # Frame encoding failed
+                metrics_collector.record_camera_frame(
+                    self.camera_id,
+                    processed=False
+                )
 
             # Generate zone-aware events
             if result.boxes:
@@ -117,7 +158,7 @@ class StreamContext:
                             pass
 
             # Sleep to maintain fps
-            elapsed = time.time() - start_time
+            elapsed = time.time() - loop_start
             sleep_time = frame_interval - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
@@ -132,10 +173,22 @@ class StreamContext:
         x, y = 100, 100
         dx, dy = 15, 15
         
+        # Track frame timing for FPS calculation
+        frame_times = []
+        
         while self._running:
             start_time = time.time()
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             frame[:] = (40, 40, 40)
+            
+            # Calculate input FPS
+            current_time = time.time()
+            frame_times.append(current_time)
+            if len(frame_times) > 30:
+                frame_times.pop(0)
+            if len(frame_times) >= 2:
+                input_fps = len(frame_times) / (frame_times[-1] - frame_times[0])
+                metrics_collector.update_camera_input_fps(self.camera_id, input_fps)
             
             x += dx
             y += dy
@@ -151,6 +204,12 @@ class StreamContext:
                 for q in self.video_clients:
                     try: q.put_nowait(frame_bytes)
                     except Exception: pass
+                
+                # Record frame processing for dummy feed
+                metrics_collector.record_camera_frame(
+                    self.camera_id,
+                    processed=True
+                )
                     
             # Dummy event
             if x % 30 == 0:
