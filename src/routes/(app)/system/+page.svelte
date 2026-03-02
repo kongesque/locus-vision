@@ -1,10 +1,19 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { Activity, Cpu, HardDrive, MemoryStick, Video, Camera, Database, Zap } from '@lucide/svelte';
+	import {
+		Activity,
+		Cpu,
+		HardDrive,
+		MemoryStick,
+		Video,
+		Camera,
+		Database,
+		Zap
+	} from '@lucide/svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	
+
 	// Frigate-style detailed camera stats
 	interface CameraStat {
 		id: string;
@@ -20,7 +29,7 @@
 		cpu_percent?: number;
 		memory_mb?: number;
 	}
-	
+
 	// Frigate-style detector with percentiles
 	interface DetectorStat {
 		model_name: string;
@@ -33,20 +42,20 @@
 		avg_detections: number;
 		detector_type: string;
 	}
-	
+
 	interface ProcessStat {
 		name: string;
 		cpu_percent: number;
 		memory_mb: number;
 	}
-	
+
 	interface StorageStat {
 		total: { used_gb: number; total_gb: number; percent: number };
 		recordings: { size_gb: number; file_count: number };
 		database: { size_mb: number };
 		cache?: { size_mb: number };
 	}
-	
+
 	interface SystemStat {
 		cpu_percent: number;
 		memory_percent: number;
@@ -54,7 +63,7 @@
 		memory_total_mb: number;
 		processes: ProcessStat[];
 	}
-	
+
 	interface Stats {
 		timestamp: number;
 		system: SystemStat;
@@ -66,13 +75,13 @@
 			total_cameras: number;
 		};
 	}
-	
+
 	let stats: Stats | null = $state(null);
 	let refreshInterval: ReturnType<typeof setInterval> | null = null;
 	let lastUpdated = $state<Date | null>(null);
 	let error = $state<string | null>(null);
 	let activeTab = $state('cameras');
-	
+
 	async function fetchStats() {
 		try {
 			const res = await fetch('http://localhost:8000/api/system/stats');
@@ -85,16 +94,16 @@
 			console.error('[System] Failed to fetch stats:', e);
 		}
 	}
-	
+
 	onMount(() => {
 		fetchStats();
 		refreshInterval = setInterval(fetchStats, 2000);
 	});
-	
+
 	onDestroy(() => {
 		if (refreshInterval) clearInterval(refreshInterval);
 	});
-	
+
 	function formatBytes(mb: number): string {
 		if (mb > 1024 * 1024) {
 			return `${(mb / 1024 / 1024).toFixed(2)} TB`;
@@ -104,13 +113,13 @@
 		}
 		return `${Math.round(mb)} MB`;
 	}
-	
+
 	function getStatusColor(percent: number): string {
 		if (percent < 50) return 'bg-emerald-500';
 		if (percent < 80) return 'bg-amber-500';
 		return 'bg-red-500';
 	}
-	
+
 	function getFpsStatus(input: number, process: number): string {
 		if (process < input * 0.5) return 'text-red-500';
 		if (process < input * 0.8) return 'text-amber-500';
@@ -118,14 +127,12 @@
 	}
 </script>
 
-<div class="container mx-auto p-6 space-y-6">
+<div class="container mx-auto space-y-6 p-6">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">System</h1>
-			<p class="text-muted-foreground mt-1">
-				Hardware usage and application performance metrics
-			</p>
+			<p class="mt-1 text-muted-foreground">Hardware usage and application performance metrics</p>
 		</div>
 		<div class="flex items-center gap-4">
 			{#if error}
@@ -137,24 +144,26 @@
 			{/if}
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
 				<span class="relative flex h-2 w-2">
-					<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-					<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+					></span>
+					<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
 				</span>
 				Live
 			</div>
 		</div>
 	</div>
-	
+
 	{#if !stats}
-		<div class="flex items-center justify-center h-64">
-			<div class="animate-pulse flex items-center gap-2 text-muted-foreground">
+		<div class="flex h-64 items-center justify-center">
+			<div class="flex animate-pulse items-center gap-2 text-muted-foreground">
 				<Activity class="h-5 w-5 animate-spin" />
 				Loading system metrics...
 			</div>
 		</div>
 	{:else}
 		<!-- Top Stats Cards (Frigate-style) -->
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
 			<Card>
 				<CardHeader class="flex flex-row items-center justify-between pb-2">
 					<CardTitle class="text-sm font-medium">CPU Usage</CardTitle>
@@ -163,14 +172,16 @@
 				<CardContent>
 					<div class="text-2xl font-bold">{stats.system.cpu_percent.toFixed(1)}%</div>
 					<div class="mt-2 h-2 w-full rounded-full bg-secondary">
-						<div 
-							class="h-2 rounded-full transition-all duration-500 {getStatusColor(stats.system.cpu_percent)}"
+						<div
+							class="h-2 rounded-full transition-all duration-500 {getStatusColor(
+								stats.system.cpu_percent
+							)}"
 							style="width: {stats.system.cpu_percent}%"
 						></div>
 					</div>
 				</CardContent>
 			</Card>
-			
+
 			<Card>
 				<CardHeader class="flex flex-row items-center justify-between pb-2">
 					<CardTitle class="text-sm font-medium">Memory</CardTitle>
@@ -178,18 +189,20 @@
 				</CardHeader>
 				<CardContent>
 					<div class="text-2xl font-bold">{stats.system.memory_percent.toFixed(1)}%</div>
-					<p class="text-xs text-muted-foreground mt-1">
+					<p class="mt-1 text-xs text-muted-foreground">
 						{formatBytes(stats.system.memory_used_mb)} / {formatBytes(stats.system.memory_total_mb)}
 					</p>
 					<div class="mt-2 h-2 w-full rounded-full bg-secondary">
-						<div 
-							class="h-2 rounded-full transition-all duration-500 {getStatusColor(stats.system.memory_percent)}"
+						<div
+							class="h-2 rounded-full transition-all duration-500 {getStatusColor(
+								stats.system.memory_percent
+							)}"
 							style="width: {stats.system.memory_percent}%"
 						></div>
 					</div>
 				</CardContent>
 			</Card>
-			
+
 			<Card>
 				<CardHeader class="flex flex-row items-center justify-between pb-2">
 					<CardTitle class="text-sm font-medium">Storage</CardTitle>
@@ -198,60 +211,63 @@
 				<CardContent>
 					{@const diskPercent = stats.storage?.total?.percent || 0}
 					<div class="text-2xl font-bold">{diskPercent.toFixed(1)}%</div>
-					<p class="text-xs text-muted-foreground mt-1">
-						{stats.storage?.total?.used_gb?.toFixed(1) || 0} GB / {stats.storage?.total?.total_gb?.toFixed(0) || 0} GB
+					<p class="mt-1 text-xs text-muted-foreground">
+						{stats.storage?.total?.used_gb?.toFixed(1) || 0} GB / {stats.storage?.total?.total_gb?.toFixed(
+							0
+						) || 0} GB
 					</p>
 					<div class="mt-2 h-2 w-full rounded-full bg-secondary">
-						<div 
+						<div
 							class="h-2 rounded-full transition-all duration-500 {getStatusColor(diskPercent)}"
 							style="width: {diskPercent}%"
 						></div>
 					</div>
 				</CardContent>
 			</Card>
-			
+
 			<Card>
 				<CardHeader class="flex flex-row items-center justify-between pb-2">
 					<CardTitle class="text-sm font-medium">Detector</CardTitle>
 					<Zap class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					{#if stats.detector?.inference_speed?.p50}
-						<div class="text-2xl font-bold">{stats.detector.inference_speed.p50.toFixed(1)}ms</div>
-						<p class="text-xs text-muted-foreground mt-1">
-							{stats.detector.model_name} - {stats.detector.total_inferences?.toLocaleString() || 0} inferences
+					{#if stats.detector?.inference_speed}
+						<div class="text-2xl font-bold">
+							{(stats.detector.inference_speed.p50 || 0).toFixed(1)}ms
+						</div>
+						<p class="mt-1 text-xs text-muted-foreground">
+							{stats.detector.model_name || 'yolo11n'} - {stats.detector.total_inferences?.toLocaleString() ||
+								0} inferences
 						</p>
-						<div class="mt-2 text-xs text-muted-foreground flex gap-2">
-							<span>p90: {stats.detector.inference_speed.p90?.toFixed(1)}ms</span>
-							<span>p99: {stats.detector.inference_speed.p99?.toFixed(1)}ms</span>
+						<div class="mt-2 flex gap-2 text-xs text-muted-foreground">
+							<span>p90: {(stats.detector.inference_speed.p90 || 0).toFixed(1)}ms</span>
+							<span>p99: {(stats.detector.inference_speed.p99 || 0).toFixed(1)}ms</span>
 						</div>
 					{:else}
-						<div class="text-2xl font-bold">{stats.detector?.avg_inference_ms?.toFixed(1) || 0}ms</div>
-						<p class="text-xs text-muted-foreground mt-1">
-							{stats.detector?.model_name || 'yolo11n'} - {stats.detector?.total_inferences?.toLocaleString() || 0} inferences
-						</p>
+						<div class="text-2xl font-bold">0.0ms</div>
+						<p class="mt-1 text-xs text-muted-foreground">No detector data available</p>
 					{/if}
 				</CardContent>
 			</Card>
 		</div>
-		
+
 		<!-- Frigate-style Tabs -->
 		<Tabs bind:value={activeTab} class="w-full">
 			<TabsList class="grid w-full grid-cols-3 lg:w-[400px]">
 				<TabsTrigger value="cameras">
-					<Camera class="h-4 w-4 mr-2" />
+					<Camera class="mr-2 h-4 w-4" />
 					Cameras
 				</TabsTrigger>
 				<TabsTrigger value="processes">
-					<Cpu class="h-4 w-4 mr-2" />
+					<Cpu class="mr-2 h-4 w-4" />
 					Processes
 				</TabsTrigger>
 				<TabsTrigger value="storage">
-					<Database class="h-4 w-4 mr-2" />
+					<Database class="mr-2 h-4 w-4" />
 					Storage
 				</TabsTrigger>
 			</TabsList>
-			
+
 			<!-- Cameras Tab (Frigate-style) -->
 			<TabsContent value="cameras">
 				<Card>
@@ -265,8 +281,8 @@
 					</CardHeader>
 					<CardContent>
 						{#if stats.cameras.length === 0}
-							<div class="text-center py-8 text-muted-foreground">
-								<Video class="h-12 w-12 mx-auto mb-3 opacity-50" />
+							<div class="py-8 text-center text-muted-foreground">
+								<Video class="mx-auto mb-3 h-12 w-12 opacity-50" />
 								<p>No cameras currently streaming</p>
 								<p class="text-sm">Start a live stream to see camera metrics</p>
 							</div>
@@ -276,12 +292,12 @@
 									<thead>
 										<tr class="border-b text-left">
 											<th class="pb-3 font-medium">Camera</th>
-											<th class="pb-3 font-medium text-right">Status</th>
-											<th class="pb-3 font-medium text-right">Input FPS</th>
-											<th class="pb-3 font-medium text-right">Process FPS</th>
-											<th class="pb-3 font-medium text-right">Detect FPS</th>
-											<th class="pb-3 font-medium text-right">Skipped</th>
-											<th class="pb-3 font-medium text-right">Inference</th>
+											<th class="pb-3 text-right font-medium">Status</th>
+											<th class="pb-3 text-right font-medium">Input FPS</th>
+											<th class="pb-3 text-right font-medium">Process FPS</th>
+											<th class="pb-3 text-right font-medium">Detect FPS</th>
+											<th class="pb-3 text-right font-medium">Skipped</th>
+											<th class="pb-3 text-right font-medium">Inference</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -298,37 +314,50 @@
 														<Badge variant="secondary">Inactive</Badge>
 													{/if}
 												</td>
-												<td class="py-3 text-right font-mono">{cam.input_fps?.toFixed(1) || '0.0'}</td>
-												<td class="py-3 text-right font-mono {getFpsStatus(cam.input_fps || 0, cam.process_fps || 0)}">
+												<td class="py-3 text-right font-mono"
+													>{cam.input_fps?.toFixed(1) || '0.0'}</td
+												>
+												<td
+													class="py-3 text-right font-mono {getFpsStatus(
+														cam.input_fps || 0,
+														cam.process_fps || 0
+													)}"
+												>
 													{cam.process_fps?.toFixed(1) || '0.0'}
 												</td>
-												<td class="py-3 text-right font-mono">{cam.detect_fps?.toFixed(1) || '0.0'}</td>
+												<td class="py-3 text-right font-mono"
+													>{cam.detect_fps?.toFixed(1) || '0.0'}</td
+												>
 												<td class="py-3 text-right">
 													{#if (cam.skipped_fps || 0) > 0}
-														<span class="text-amber-500 font-medium">{cam.skipped_fps.toFixed(1)}/s</span>
+														<span class="font-medium text-amber-500"
+															>{cam.skipped_fps.toFixed(1)}/s</span
+														>
 													{:else}
 														<span class="text-muted-foreground">-</span>
 													{/if}
 												</td>
-												<td class="py-3 text-right font-mono">{cam.inference_ms?.toFixed(1) || '0.0'}ms</td>
+												<td class="py-3 text-right font-mono"
+													>{cam.inference_ms?.toFixed(1) || '0.0'}ms</td
+												>
 											</tr>
 										{/each}
 									</tbody>
 								</table>
 							</div>
-							
+
 							<!-- Legend -->
 							<div class="mt-4 flex gap-4 text-xs text-muted-foreground">
 								<div class="flex items-center gap-1">
-									<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+									<span class="h-2 w-2 rounded-full bg-emerald-500"></span>
 									Normal performance
 								</div>
 								<div class="flex items-center gap-1">
-									<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+									<span class="h-2 w-2 rounded-full bg-amber-500"></span>
 									Processing lag
 								</div>
 								<div class="flex items-center gap-1">
-									<span class="w-2 h-2 rounded-full bg-red-500"></span>
+									<span class="h-2 w-2 rounded-full bg-red-500"></span>
 									Significant lag
 								</div>
 							</div>
@@ -336,7 +365,7 @@
 					</CardContent>
 				</Card>
 			</TabsContent>
-			
+
 			<!-- Processes Tab -->
 			<TabsContent value="processes">
 				<Card>
@@ -345,22 +374,26 @@
 					</CardHeader>
 					<CardContent>
 						{#if !stats.system.processes || stats.system.processes.length === 0}
-							<div class="text-center py-8 text-muted-foreground">
+							<div class="py-8 text-center text-muted-foreground">
 								<p>Process-level metrics not available</p>
 							</div>
 						{:else}
 							<div class="space-y-4">
 								{#each stats.system.processes as proc}
-									<div class="flex items-center justify-between p-3 bg-muted rounded-lg">
+									<div class="flex items-center justify-between rounded-lg bg-muted p-3">
 										<div>
 											<div class="font-medium">{proc.name}</div>
-											<div class="text-xs text-muted-foreground">{proc.memory_mb?.toFixed(1) || 0} MB</div>
+											<div class="text-xs text-muted-foreground">
+												{proc.memory_mb?.toFixed(1) || 0} MB
+											</div>
 										</div>
 										<div class="flex items-center gap-4">
 											<div class="text-right">
-												<div class="text-sm font-medium">{proc.cpu_percent?.toFixed(1) || 0}% CPU</div>
-												<div class="w-24 h-1.5 bg-secondary rounded-full mt-1">
-													<div 
+												<div class="text-sm font-medium">
+													{proc.cpu_percent?.toFixed(1) || 0}% CPU
+												</div>
+												<div class="mt-1 h-1.5 w-24 rounded-full bg-secondary">
+													<div
 														class="h-full rounded-full {getStatusColor(proc.cpu_percent || 0)}"
 														style="width: {Math.min(proc.cpu_percent || 0, 100)}%"
 													></div>
@@ -374,7 +407,7 @@
 					</CardContent>
 				</Card>
 			</TabsContent>
-			
+
 			<!-- Storage Tab (Frigate-style breakdown) -->
 			<TabsContent value="storage">
 				<Card>
@@ -382,64 +415,72 @@
 						<CardTitle>Storage Breakdown</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 							<!-- Total Storage -->
-							<div class="p-4 bg-muted rounded-lg">
-								<div class="flex items-center justify-between mb-2">
+							<div class="rounded-lg bg-muted p-4">
+								<div class="mb-2 flex items-center justify-between">
 									<span class="text-sm font-medium">Total Usage</span>
 									<HardDrive class="h-4 w-4 text-muted-foreground" />
 								</div>
-								<div class="text-2xl font-bold">{stats.storage?.total?.percent?.toFixed(1) || 0}%</div>
-								<div class="text-xs text-muted-foreground mt-1">
-									{stats.storage?.total?.used_gb?.toFixed(1) || 0} / {stats.storage?.total?.total_gb?.toFixed(0) || 0} GB
+								<div class="text-2xl font-bold">
+									{stats.storage?.total?.percent?.toFixed(1) || 0}%
 								</div>
-								<div class="w-full h-2 bg-secondary rounded-full mt-3">
-									<div 
+								<div class="mt-1 text-xs text-muted-foreground">
+									{stats.storage?.total?.used_gb?.toFixed(1) || 0} / {stats.storage?.total?.total_gb?.toFixed(
+										0
+									) || 0} GB
+								</div>
+								<div class="mt-3 h-2 w-full rounded-full bg-secondary">
+									<div
 										class="h-full rounded-full {getStatusColor(stats.storage?.total?.percent || 0)}"
 										style="width: {stats.storage?.total?.percent || 0}%"
 									></div>
 								</div>
 							</div>
-							
+
 							<!-- Recordings -->
-							<div class="p-4 bg-muted rounded-lg">
-								<div class="flex items-center justify-between mb-2">
+							<div class="rounded-lg bg-muted p-4">
+								<div class="mb-2 flex items-center justify-between">
 									<span class="text-sm font-medium">Recordings</span>
 									<Video class="h-4 w-4 text-muted-foreground" />
 								</div>
-								<div class="text-2xl font-bold">{stats.storage?.recordings?.size_gb?.toFixed(2) || 0} GB</div>
-								<div class="text-xs text-muted-foreground mt-1">
+								<div class="text-2xl font-bold">
+									{stats.storage?.recordings?.size_gb?.toFixed(2) || 0} GB
+								</div>
+								<div class="mt-1 text-xs text-muted-foreground">
 									{stats.storage?.recordings?.file_count?.toLocaleString() || 0} files
 								</div>
 							</div>
-							
+
 							<!-- Database -->
-							<div class="p-4 bg-muted rounded-lg">
-								<div class="flex items-center justify-between mb-2">
+							<div class="rounded-lg bg-muted p-4">
+								<div class="mb-2 flex items-center justify-between">
 									<span class="text-sm font-medium">Database</span>
 									<Database class="h-4 w-4 text-muted-foreground" />
 								</div>
-								<div class="text-2xl font-bold">{stats.storage?.database?.size_mb?.toFixed(1) || 0} MB</div>
-								<div class="text-xs text-muted-foreground mt-1">
-									Events & configuration
+								<div class="text-2xl font-bold">
+									{stats.storage?.database?.size_mb?.toFixed(1) || 0} MB
 								</div>
+								<div class="mt-1 text-xs text-muted-foreground">Events & configuration</div>
 							</div>
 						</div>
 					</CardContent>
 				</Card>
 			</TabsContent>
 		</Tabs>
-		
+
 		<!-- Prometheus Info Footer -->
 		<Card class="bg-muted/50">
 			<CardContent class="py-4">
 				<div class="flex items-center justify-between text-sm">
 					<div class="text-muted-foreground">
 						<span class="font-medium">Prometheus metrics:</span>
-						<code class="ml-2 bg-background px-2 py-1 rounded text-xs">http://localhost:8000/api/metrics</code>
+						<code class="ml-2 rounded bg-background px-2 py-1 text-xs"
+							>http://localhost:8000/api/metrics</code
+						>
 					</div>
-					<a 
-						href="http://localhost:8000/api/metrics" 
+					<a
+						href="http://localhost:8000/api/metrics"
 						target="_blank"
 						class="text-primary hover:underline"
 					>
