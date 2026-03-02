@@ -15,14 +15,18 @@ The exported .onnx file will be saved to data/models/<model_name>.onnx
 import sys
 import os
 import shutil
+import argparse
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python scripts/export_model.py <model_name>")
-        print("Example: python scripts/export_model.py yolo11n")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="One-time model exporter: converts YOLO .pt → .onnx")
+    parser.add_argument("model_name", help="Name of the model (e.g., yolo11n)")
+    parser.add_argument("--half", action="store_true", help="Export to FP16 half-precision ONNX")
+    parser.add_argument("--int8", action="store_true", help="Export to INT8 quantized ONNX")
+    args = parser.parse_args()
 
-    model_name = sys.argv[1]
+    model_name = args.model_name
+    half_precision = args.half
+    int8_precision = args.int8
 
     try:
         from ultralytics import YOLO
@@ -50,12 +54,26 @@ def main():
             model = YOLO(pt_path)
 
     # Export to ONNX
-    print(f"Exporting {model_name} to ONNX format ...")
-    export_path = model.export(format="onnx", imgsz=640, simplify=True)
+    print(f"Exporting {model_name} to ONNX format (half={half_precision}, int8={int8_precision}) ...")
+    
+    export_kwargs = {"format": "onnx", "imgsz": 640, "simplify": True}
+    if half_precision:
+        export_kwargs["half"] = True
+    if int8_precision:
+        export_kwargs["int8"] = True
+        export_kwargs["data"] = "coco128.yaml"  # Ultralytics often needs dataset for calibration
+        
+    export_path = model.export(**export_kwargs)
     
     # The export typically saves next to the .pt file
     # Move to our models dir if needed
-    target_path = os.path.join(models_dir, f"{model_name}.onnx")
+    suffix = ""
+    if int8_precision:
+        suffix = "_int8"
+    elif half_precision:
+        suffix = "_half"
+        
+    target_path = os.path.join(models_dir, f"{model_name}{suffix}.onnx")
     if export_path and os.path.exists(export_path) and os.path.abspath(export_path) != os.path.abspath(target_path):
         shutil.move(export_path, target_path)
         print(f"Moved exported model to {target_path}")

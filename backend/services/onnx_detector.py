@@ -129,13 +129,6 @@ class OnnxDetector:
         self.input_h = shape[2] if isinstance(shape[2], int) else 640
         self.input_w = shape[3] if isinstance(shape[3], int) else 640
 
-        # ByteTrack tracker (from supervision)
-        self.tracker = sv.ByteTrack(
-            track_activation_threshold=conf_threshold,
-            minimum_matching_threshold=0.8,
-            frame_rate=30,
-        )
-
     def _preprocess(self, frame: np.ndarray) -> tuple[np.ndarray, float, float, int, int]:
         """
         Letterbox-resize + normalize to [1, 3, H, W] float32.
@@ -227,42 +220,19 @@ class OnnxDetector:
         boxes_xywh = self._xyxy_to_xywh(boxes_xyxy)
         return DetectionResult(boxes_xywh, scores, class_ids)
 
-    def track(self, frame: np.ndarray, classes: list[int] | None = None) -> DetectionResult:
-        """Run detection + ByteTrack tracking."""
+    def get_detections(self, frame: np.ndarray, classes: list[int] | None = None) -> sv.Detections:
+        """Run detection and return supervision Detections object for upstream tracking."""
         blob, ratio, _, pad_w, pad_h = self._preprocess(frame)
         outputs = self.session.run(None, {self.input_name: blob})
         boxes_xyxy, scores, class_ids = self._postprocess(outputs[0], ratio, pad_w, pad_h, classes)
 
         if len(boxes_xyxy) == 0:
-            return DetectionResult(np.empty((0, 4)), np.empty(0), np.empty(0, dtype=int), track_ids=[])
+            return sv.Detections.empty()
 
-        # Feed into supervision ByteTrack
-        detections = sv.Detections(
+        return sv.Detections(
             xyxy=boxes_xyxy,
             confidence=scores,
             class_id=class_ids,
-        )
-        tracked = self.tracker.update_with_detections(detections)
-
-        if len(tracked) == 0:
-            return DetectionResult(np.empty((0, 4)), np.empty(0), np.empty(0, dtype=int), track_ids=[])
-
-        boxes_xywh = self._xyxy_to_xywh(tracked.xyxy)
-        track_ids = tracked.tracker_id.tolist() if tracked.tracker_id is not None else []
-
-        return DetectionResult(
-            boxes_xywh=boxes_xywh,
-            scores=tracked.confidence,
-            class_ids=tracked.class_id.astype(int),
-            track_ids=track_ids,
-        )
-
-    def reset_tracker(self):
-        """Reset tracker state (call between different video sources)."""
-        self.tracker = sv.ByteTrack(
-            track_activation_threshold=self.conf_threshold,
-            minimum_matching_threshold=0.8,
-            frame_rate=30,
         )
 
     @staticmethod

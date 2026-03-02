@@ -7,6 +7,7 @@ Wraps the ONNX detector and adds stateful zone-aware counting logic.
 
 import cv2
 import numpy as np
+import supervision as sv
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from services.onnx_detector import get_detector, OnnxDetector
@@ -74,6 +75,11 @@ class AnalyticsEngine:
 
     def __init__(self, model_name: str = "yolo11n", zones: list = None, full_frame_classes: list = None):
         self.detector: OnnxDetector = get_detector(model_name)
+        self.tracker = sv.ByteTrack(
+            track_activation_threshold=self.detector.conf_threshold,
+            minimum_matching_threshold=0.8,
+            frame_rate=30,
+        )
         self.track_history: dict[int, list] = {}
         self.crossed_objects: dict[int, bool] = {}
         self.zone_crossed_objects: dict[str, set[int]] = {}
@@ -122,7 +128,11 @@ class AnalyticsEngine:
         self.crossed_objects.clear()
         for v in self.zone_crossed_objects.values():
             v.clear()
-        self.detector.reset_tracker()
+        self.tracker = sv.ByteTrack(
+            track_activation_threshold=self.detector.conf_threshold,
+            minimum_matching_threshold=0.8,
+            frame_rate=30,
+        )
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=False)
         self.last_result = None
 
@@ -160,13 +170,19 @@ class AnalyticsEngine:
         classes_arg = self._compute_required_classes()
 
         # Run ONNX detection + ByteTrack tracking
-        result = self.detector.track(frame, classes=classes_arg)
+        detections = self.detector.get_detections(frame, classes=classes_arg)
+        tracked = self.tracker.update_with_detections(detections)
 
         boxes_data = []
 
-        if result.has_detections and result.track_ids:
-            for box, track_id, cls_idx, conf in zip(
-                result.boxes_xywh, result.track_ids, result.class_ids, result.scores
+        if len(tracked) > 0 and tracked.tracker_id is not None:
+            boxes_xyxy = tracked.xyxy
+            track_ids = tracked.tracker_id
+            class_ids = tracked.class_id
+            scores = tracked.confidence
+
+            for box_xyxy, track_id, cls_idx, conf in zip(
+                boxes_xyxy, track_ids, class_ids, scores
             ):
                 cls_idx = int(cls_idx)
                 
@@ -178,10 +194,10 @@ class AnalyticsEngine:
                 # Scale the YOLO boxes back up to the original high-res camera dimensions
                 # before testing against `zone.poly` (which was drawn on the high-res frame).
                 inv_scale = 1.0 / scale
-                cx = float(box[0]) * inv_scale
-                cy = float(box[1]) * inv_scale
-                bw = float(box[2]) * inv_scale
-                bh = float(box[3]) * inv_scale
+                bw = float(box_xyxy[2] - box_xyxy[0]) * inv_scale
+                bh = float(box_xyxy[3] - box_xyxy[1]) * inv_scale
+                cx = float((box_xyxy[0] + box_xyxy[2]) / 2) * inv_scale
+                cy = float((box_xyxy[1] + box_xyxy[3]) / 2) * inv_scale
                 center = (int(cx), int(cy))
 
                 # Update track history

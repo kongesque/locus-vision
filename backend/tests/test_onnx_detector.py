@@ -24,6 +24,7 @@ from services.onnx_detector import (
     _nms,
     MODELS_DIR,
 )
+import supervision as sv
 
 
 # ── Fixtures ─────────────────────────────────────────────────────
@@ -171,32 +172,19 @@ class TestOnnxDetector:
         assert len(result.scores) == n
         assert len(result.class_ids) == n
 
-    def test_track_returns_track_ids(self, detector, blank_frame):
-        """track() returns a result with track_ids (possibly empty)."""
-        result = detector.track(blank_frame)
-        assert isinstance(result, DetectionResult)
-        assert result.track_ids is not None  # always a list for track()
-        assert isinstance(result.track_ids, list)
-
-    def test_track_shapes_consistent(self, detector, noisy_frame):
-        """track() output arrays all match in length."""
-        result = detector.track(noisy_frame)
-        n = len(result.boxes_xywh)
-        assert len(result.scores) == n
-        assert len(result.class_ids) == n
-        if result.has_detections:
-            assert len(result.track_ids) == n
+    def test_get_detections(self, detector, noisy_frame):
+        """get_detections() returns a supervision Detections object."""
+        detections = detector.get_detections(noisy_frame)
+        assert isinstance(detections, sv.Detections)
+        n = len(detections.xyxy)
+        assert len(detections.confidence) == n
+        assert len(detections.class_id) == n
 
     def test_class_filter(self, detector, noisy_frame):
         """Passing a class filter only returns that class."""
         result = detector.detect(noisy_frame, classes=[0])  # person only
         for cls_id in result.class_ids:
             assert cls_id == 0
-
-    def test_reset_tracker(self, detector):
-        """reset_tracker() does not error and creates a fresh tracker."""
-        detector.reset_tracker()
-        assert detector.tracker is not None
 
     def test_xyxy_to_xywh_conversion(self):
         """Static conversion from xyxy to xywh is correct."""
