@@ -1,8 +1,9 @@
 """
 System and application metrics collection service for LocusVision.
 
-Collects CPU, memory, storage usage and application-level metrics
-like detection FPS, inference latency, and camera stream health.
+Inspired by Frigate's metrics system - collects CPU, memory, storage usage 
+and detailed application metrics like detection FPS, inference latency percentiles,
+and per-camera stream health.
 """
 
 import time
@@ -24,25 +25,45 @@ class SystemMetrics:
     memory_total_mb: float
     disk_used_gb: float
     disk_total_gb: float
+    processes: List[dict] = field(default_factory=list)
 
 
 @dataclass
 class CameraMetrics:
-    """Per-camera performance metrics."""
+    """Per-camera performance metrics (Frigate-style)."""
     camera_id: str
-    timestamp: float
-    input_fps: float = 0.0
-    processed_fps: float = 0.0
+    camera_name: str = ""
+    timestamp: float = 0
+    
+    # FPS metrics (Frigate-style)
+    input_fps: float = 0.0        # FPS from camera stream
+    process_fps: float = 0.0      # FPS processed by detector
+    detect_fps: float = 0.0       # FPS with detections
+    skipped_fps: float = 0.0      # Frames skipped due to performance
+    
+    # Frame counters
     dropped_frames: int = 0
     total_frames: int = 0
+    
+    # Detection metrics
     inference_ms: float = 0.0
     inference_count: int = 0
+    
+    # Process stats
+    cpu_percent: float = 0.0
+    memory_mb: float = 0.0
+    
     is_active: bool = False
+    
+    # Internal tracking for FPS calculation
+    _frame_timestamps: deque = field(default_factory=lambda: deque(maxlen=60))
+    _process_timestamps: deque = field(default_factory=lambda: deque(maxlen=60))
+    _detect_timestamps: deque = field(default_factory=lambda: deque(maxlen=60))
 
 
 @dataclass
 class DetectorMetrics:
-    """ONNX detector performance metrics."""
+    """ONNX detector performance metrics with percentiles (Frigate-style)."""
     timestamp: float
     inference_ms: float
     num_detections: int
@@ -53,8 +74,11 @@ class MetricsCollector:
     """
     Singleton metrics collector for LocusVision.
     
-    Collects system metrics every second and aggregates application
-    metrics from instrumented components.
+    Inspired by Frigate's metrics collection:
+    - Collects system metrics every second
+    - Tracks per-camera input/process/detect FPS separately
+    - Calculates inference latency percentiles (p50, p90, p99)
+    - Monitors process-level resource usage
     """
     _instance: Optional['MetricsCollector'] = None
     _lock: Lock = Lock()
@@ -120,10 +144,25 @@ class MetricsCollector:
                 await asyncio.sleep(1)
     
     def _collect_system_metrics(self):
-        """Collect current system resource usage."""
+        """Collect current system resource usage with process breakdown."""
         try:
             mem = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
+            
+            # Collect process-level metrics (Frigate-style)
+            processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
+                try:
+                    name = proc.info['name']
+                    # Track relevant processes
+                    if any(x in name.lower() for x in ['python', 'ffmpeg', 'onnx']):
+                        processes.append({
+                            'name': name,
+                            'cpu_percent': proc.info['cpu_percent'] or 0,
+                            'memory_mb': (proc.info['memory_info'].rss / 1024 / 1024) if proc.info['memory_info'] else 0
+                        })
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
             
             metrics = SystemMetrics(
                 timestamp=time.time(),
@@ -133,19 +172,21 @@ class MetricsCollector:
                 memory_total_mb=mem.total / 1024 / 1024,
                 disk_used_gb=disk.used / 1024 / 1024 / 1024,
                 disk_total_gb=disk.total / 1024 / 1024 / 1024,
+                processes=processes
             )
             self._system_history.append(metrics)
         except Exception as e:
             print(f"[MetricsCollector] Error collecting system metrics: {e}")
     
-    # ── Camera Metrics API ─────────────────────────────────────────
+    # ── Camera Metrics API (Frigate-style) ─────────────────────────
     
-    def register_camera(self, camera_id: str):
+    def register_camera(self, camera_id: str, camera_name: str = ""):
         """Register a new camera for metrics tracking."""
         with self._camera_lock:
             if camera_id not in self._camera_metrics:
                 self._camera_metrics[camera_id] = CameraMetrics(
                     camera_id=camera_id,
+                    camera_name=camera_name or camera_id[:8],
                     timestamp=time.time(),
                     is_active=True
                 )
@@ -157,47 +198,82 @@ class MetricsCollector:
                 self._camera_metrics[camera_id].is_active = False
     
     def record_camera_frame(self, camera_id: str, processed: bool = True, 
-                           inference_ms: float = 0):
+                           had_detection: bool = False, inference_ms: float = 0):
         """
-        Record a frame processed by a camera.
+        Record a frame processed by a camera (Frigate-style).
         
         Args:
             camera_id: Unique camera identifier
-            processed: Whether the frame was successfully processed
-            inference_ms: Time spent in AI detection (if applicable)
+            processed: Whether the frame went through detection
+            had_detection: Whether the frame had objects detected
+            inference_ms: Time spent in AI detection
         """
         with self._camera_lock:
             if camera_id not in self._camera_metrics:
                 self.register_camera(camera_id)
             
             cam = self._camera_metrics[camera_id]
-            cam.timestamp = time.time()
+            now = time.time()
+            cam.timestamp = now
             cam.total_frames += 1
             
+            # Track frame timestamp for input FPS calculation
+            cam._frame_timestamps.append(now)
+            
             if processed:
-                cam.processed_fps = self._calculate_rolling_fps(cam.processed_fps)
+                cam._process_timestamps.append(now)
+                
+                if had_detection:
+                    cam._detect_timestamps.append(now)
+                
+                if inference_ms > 0:
+                    # Rolling average of inference time
+                    if cam.inference_count == 0:
+                        cam.inference_ms = inference_ms
+                    else:
+                        cam.inference_ms = (cam.inference_ms * 0.9) + (inference_ms * 0.1)
+                    cam.inference_count += 1
             else:
                 cam.dropped_frames += 1
             
-            if inference_ms > 0:
-                # Rolling average of inference time
-                if cam.inference_count == 0:
-                    cam.inference_ms = inference_ms
-                else:
-                    cam.inference_ms = (cam.inference_ms * 0.9) + (inference_ms * 0.1)
-                cam.inference_count += 1
+            # Recalculate FPS metrics
+            self._calculate_camera_fps(cam)
+    
+    def _calculate_camera_fps(self, cam: CameraMetrics):
+        """Calculate FPS metrics from timestamps (Frigate-style)."""
+        now = time.time()
+        window = 5.0  # 5-second window for FPS calculation
+        
+        # Input FPS: all frames received
+        cutoff = now - window
+        while cam._frame_timestamps and cam._frame_timestamps[0] < cutoff:
+            cam._frame_timestamps.popleft()
+        cam.input_fps = len(cam._frame_timestamps) / window if cam._frame_timestamps else 0
+        
+        # Process FPS: frames that went through detection
+        while cam._process_timestamps and cam._process_timestamps[0] < cutoff:
+            cam._process_timestamps.popleft()
+        cam.process_fps = len(cam._process_timestamps) / window if cam._process_timestamps else 0
+        
+        # Detect FPS: frames with detections
+        while cam._detect_timestamps and cam._detect_timestamps[0] < cutoff:
+            cam._detect_timestamps.popleft()
+        cam.detect_fps = len(cam._detect_timestamps) / window if cam._detect_timestamps else 0
+        
+        # Skipped FPS: difference between input and processed
+        cam.skipped_fps = max(0, cam.input_fps - cam.process_fps)
     
     def update_camera_input_fps(self, camera_id: str, fps: float):
-        """Update the input FPS for a camera (from stream metadata)."""
+        """Update the input FPS from stream metadata."""
         with self._camera_lock:
             if camera_id in self._camera_metrics:
                 self._camera_metrics[camera_id].input_fps = fps
     
-    def _calculate_rolling_fps(self, current_fps: float, alpha: float = 0.9) -> float:
-        """Calculate exponential moving average for FPS."""
-        # This is a simplified calculation - in practice, you'd track
-        # timestamps and calculate actual FPS over a window
-        return current_fps * alpha + (1 / alpha) * 0.1
+    def update_camera_name(self, camera_id: str, name: str):
+        """Update the display name for a camera."""
+        with self._camera_lock:
+            if camera_id in self._camera_metrics:
+                self._camera_metrics[camera_id].camera_name = name
     
     # ── Detector Metrics API ────────────────────────────────────────
     
@@ -219,7 +295,7 @@ class MetricsCollector:
                 model_name=model_name
             ))
     
-    # ── Query API ───────────────────────────────────────────────────
+    # ── Query API (Frigate-style) ───────────────────────────────────
     
     def get_current_system_stats(self) -> Optional[SystemMetrics]:
         """Get the most recent system metrics."""
@@ -234,42 +310,112 @@ class MetricsCollector:
     def get_camera_stats(self) -> Dict[str, CameraMetrics]:
         """Get current metrics for all cameras."""
         with self._camera_lock:
+            # Recalculate FPS for all cameras before returning
+            for cam in self._camera_metrics.values():
+                self._calculate_camera_fps(cam)
             return dict(self._camera_metrics)
     
     def get_detector_stats(self, window_seconds: int = 60) -> dict:
-        """Get aggregated detector statistics."""
+        """
+        Get detector statistics with percentiles (Frigate-style).
+        
+        Returns:
+            Dict with p50, p90, p99 percentiles and other stats
+        """
         with self._detector_lock:
             cutoff = time.time() - window_seconds
             recent = [m for m in self._detector_history if m.timestamp > cutoff]
             
             if not recent:
                 return {
-                    "avg_inference_ms": 0,
-                    "min_inference_ms": 0,
-                    "max_inference_ms": 0,
+                    "model_name": "unknown",
+                    "detector_type": "CPU",
+                    "inference_speed": {
+                        "p50": 0,
+                        "p90": 0,
+                        "p99": 0
+                    },
                     "total_inferences": 0,
-                    "avg_detections": 0,
-                    "model_name": "unknown"
+                    "avg_detections": 0
                 }
             
-            inferences = [m.inference_ms for m in recent]
+            inferences = sorted([m.inference_ms for m in recent])
             detections = [m.num_detections for m in recent]
             models = set(m.model_name for m in recent)
             
+            # Calculate percentiles
+            def percentile(sorted_data, p):
+                if not sorted_data:
+                    return 0
+                k = (len(sorted_data) - 1) * p / 100
+                f = int(k)
+                c = f + 1 if f + 1 < len(sorted_data) else f
+                return sorted_data[f] + (k - f) * (sorted_data[c] - sorted_data[f])
+            
             return {
-                "avg_inference_ms": sum(inferences) / len(inferences),
-                "min_inference_ms": min(inferences),
-                "max_inference_ms": max(inferences),
+                "model_name": list(models)[0] if len(models) == 1 else "mixed",
+                "detector_type": "CPU",  # Could be extended to detect GPU/Coral
+                "inference_speed": {
+                    "p50": percentile(inferences, 50),
+                    "p90": percentile(inferences, 90),
+                    "p99": percentile(inferences, 99)
+                },
                 "total_inferences": len(recent),
-                "avg_detections": sum(detections) / len(detections) if detections else 0,
-                "model_name": list(models)[0] if len(models) == 1 else "mixed"
+                "avg_detections": sum(detections) / len(detections) if detections else 0
             }
     
+    def get_storage_stats(self) -> dict:
+        """Get storage breakdown (Frigate-style)."""
+        import os
+        from pathlib import Path
+        
+        system = self.get_current_system_stats()
+        
+        # Calculate recordings directory
+        recordings_dir = Path("backend/data/recordings")
+        recordings_size_gb = 0
+        recordings_count = 0
+        
+        if recordings_dir.exists():
+            try:
+                for f in recordings_dir.rglob("*"):
+                    if f.is_file():
+                        recordings_size_gb += f.stat().st_size
+                        recordings_count += 1
+                recordings_size_gb /= (1024 ** 3)
+            except Exception:
+                pass
+        
+        # Database size
+        db_size_mb = 0
+        db_path = Path("backend/data/locusvision.db")
+        if db_path.exists():
+            try:
+                db_size_mb = db_path.stat().st_size / (1024 ** 2)
+            except Exception:
+                pass
+        
+        return {
+            "total": {
+                "used_gb": round(system.disk_used_gb, 2) if system else 0,
+                "total_gb": round(system.disk_total_gb, 2) if system else 0,
+                "percent": round((system.disk_used_gb / system.disk_total_gb * 100), 1) if system and system.disk_total_gb > 0 else 0,
+            },
+            "recordings": {
+                "size_gb": round(recordings_size_gb, 2),
+                "file_count": recordings_count,
+            },
+            "database": {
+                "size_mb": round(db_size_mb, 2),
+            }
+        }
+    
     def get_full_stats(self) -> dict:
-        """Get complete metrics snapshot for API response."""
+        """Get complete metrics snapshot for API response (Frigate-style)."""
         system = self.get_current_system_stats()
         detector = self.get_detector_stats()
         cameras = self.get_camera_stats()
+        storage = self.get_storage_stats()
         
         return {
             "timestamp": time.time(),
@@ -278,19 +424,24 @@ class MetricsCollector:
                 "memory_percent": system.memory_percent if system else 0,
                 "memory_used_mb": round(system.memory_used_mb, 1) if system else 0,
                 "memory_total_mb": round(system.memory_total_mb, 1) if system else 0,
-                "disk_used_gb": round(system.disk_used_gb, 2) if system else 0,
-                "disk_total_gb": round(system.disk_total_gb, 2) if system else 0,
+                "processes": system.processes if system else []
             },
+            "storage": storage,
             "detector": detector,
             "cameras": [
                 {
                     "id": cam.camera_id,
+                    "name": cam.camera_name,
                     "is_active": cam.is_active,
                     "input_fps": round(cam.input_fps, 1),
-                    "processed_fps": round(cam.processed_fps, 1),
+                    "process_fps": round(cam.process_fps, 1),
+                    "detect_fps": round(cam.detect_fps, 1),
+                    "skipped_fps": round(cam.skipped_fps, 1),
                     "dropped_frames": cam.dropped_frames,
                     "total_frames": cam.total_frames,
                     "inference_ms": round(cam.inference_ms, 1),
+                    "cpu_percent": round(cam.cpu_percent, 1),
+                    "memory_mb": round(cam.memory_mb, 1)
                 }
                 for cam in cameras.values()
             ],

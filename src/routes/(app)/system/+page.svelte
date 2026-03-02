@@ -10,10 +10,10 @@
 		id: string;
 		name: string;
 		is_active: boolean;
-		input_fps: number;        // FPS from camera stream
-		process_fps: number;      // FPS processed by detector
-		detect_fps: number;       // FPS with detections (motion)
-		skipped_fps: number;      // Frames skipped due to performance
+		input_fps: number;
+		process_fps: number;
+		detect_fps: number;
+		skipped_fps: number;
 		dropped_frames: number;
 		total_frames: number;
 		inference_ms: number;
@@ -25,13 +25,13 @@
 	interface DetectorStat {
 		model_name: string;
 		inference_speed: {
-			p50: number;  // 50th percentile
-			p90: number;  // 90th percentile
-			p99: number;  // 99th percentile
+			p50: number;
+			p90: number;
+			p99: number;
 		};
 		total_inferences: number;
 		avg_detections: number;
-		detector_type: string;  // 'CPU', 'GPU', 'Coral', etc.
+		detector_type: string;
 	}
 	
 	interface ProcessStat {
@@ -119,11 +119,12 @@
 </script>
 
 <div class="container mx-auto p-6 space-y-6">
+	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">System</h1>
 			<p class="text-muted-foreground mt-1">
-				Monitor hardware usage and application performance
+				Hardware usage and application performance metrics
 			</p>
 		</div>
 		<div class="flex items-center gap-4">
@@ -152,6 +153,7 @@
 			</div>
 		</div>
 	{:else}
+		<!-- Top Stats Cards (Frigate-style) -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<Card>
 				<CardHeader class="flex flex-row items-center justify-between pb-2">
@@ -194,10 +196,10 @@
 					<HardDrive class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					{@const diskPercent = (stats.system.disk_used_gb / stats.system.disk_total_gb * 100)}
+					{@const diskPercent = stats.storage?.total?.percent || 0}
 					<div class="text-2xl font-bold">{diskPercent.toFixed(1)}%</div>
 					<p class="text-xs text-muted-foreground mt-1">
-						{stats.system.disk_used_gb.toFixed(1)} GB / {stats.system.disk_total_gb.toFixed(0)} GB
+						{stats.storage?.total?.used_gb?.toFixed(1) || 0} GB / {stats.storage?.total?.total_gb?.toFixed(0) || 0} GB
 					</p>
 					<div class="mt-2 h-2 w-full rounded-full bg-secondary">
 						<div 
@@ -210,89 +212,231 @@
 			
 			<Card>
 				<CardHeader class="flex flex-row items-center justify-between pb-2">
-					<CardTitle class="text-sm font-medium">AI Detector</CardTitle>
-					<Video class="h-4 w-4 text-muted-foreground" />
+					<CardTitle class="text-sm font-medium">Detector</CardTitle>
+					<Zap class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{stats.detector.avg_inference_ms.toFixed(1)}ms</div>
-					<p class="text-xs text-muted-foreground mt-1">
-						{stats.detector.model_name} - {stats.detector.total_inferences.toLocaleString()} inferences
-					</p>
-					<div class="mt-2 text-xs text-muted-foreground">
-						<span class="inline-flex items-center gap-1">
-							<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-							{stats.detector.avg_detections.toFixed(1)} detections/frame
-						</span>
-					</div>
+					{#if stats.detector?.inference_speed?.p50}
+						<div class="text-2xl font-bold">{stats.detector.inference_speed.p50.toFixed(1)}ms</div>
+						<p class="text-xs text-muted-foreground mt-1">
+							{stats.detector.model_name} - {stats.detector.total_inferences?.toLocaleString() || 0} inferences
+						</p>
+						<div class="mt-2 text-xs text-muted-foreground flex gap-2">
+							<span>p90: {stats.detector.inference_speed.p90?.toFixed(1)}ms</span>
+							<span>p99: {stats.detector.inference_speed.p99?.toFixed(1)}ms</span>
+						</div>
+					{:else}
+						<div class="text-2xl font-bold">{stats.detector?.avg_inference_ms?.toFixed(1) || 0}ms</div>
+						<p class="text-xs text-muted-foreground mt-1">
+							{stats.detector?.model_name || 'yolo11n'} - {stats.detector?.total_inferences?.toLocaleString() || 0} inferences
+						</p>
+					{/if}
 				</CardContent>
 			</Card>
 		</div>
 		
-		<Card>
-			<CardHeader>
-				<div class="flex items-center justify-between">
-					<CardTitle>Cameras</CardTitle>
-					<Badge variant="secondary">
-						{stats.summary.active_cameras} active / {stats.summary.total_cameras} total
-					</Badge>
-				</div>
-			</CardHeader>
-			<CardContent>
-				{#if stats.cameras.length === 0}
-					<div class="text-center py-8 text-muted-foreground">
-						<Video class="h-12 w-12 mx-auto mb-3 opacity-50" />
-						<p>No cameras currently streaming</p>
-						<p class="text-sm">Start a live stream to see camera metrics</p>
-					</div>
-				{:else}
-					<div class="overflow-x-auto">
-						<table class="w-full">
-							<thead>
-								<tr class="border-b text-left">
-									<th class="pb-3 font-medium">Camera</th>
-									<th class="pb-3 font-medium text-right">Status</th>
-									<th class="pb-3 font-medium text-right">Input FPS</th>
-									<th class="pb-3 font-medium text-right">Processed FPS</th>
-									<th class="pb-3 font-medium text-right">Dropped</th>
-									<th class="pb-3 font-medium text-right">Inference</th>
-								</tr>
-							</thead>
-							<tbody class="text-sm">
-								{#each stats.cameras as cam}
-									<tr class="border-b last:border-0">
-										<td class="py-3 font-medium">{cam.id}</td>
-										<td class="py-3 text-right">
-											{#if cam.is_active}
-												<Badge variant="default" class="bg-emerald-500">Active</Badge>
-											{:else}
-												<Badge variant="secondary">Inactive</Badge>
-											{/if}
-										</td>
-										<td class="py-3 text-right">{cam.input_fps.toFixed(1)}</td>
-										<td class="py-3 text-right">{cam.processed_fps.toFixed(1)}</td>
-										<td class="py-3 text-right">
-											{#if cam.dropped_frames > 0}
-												<span class="text-destructive font-medium">{cam.dropped_frames}</span>
-											{:else}
-												<span class="text-muted-foreground">0</span>
-											{/if}
-										</td>
-										<td class="py-3 text-right">{cam.inference_ms.toFixed(1)}ms</td>
-									</tr>
+		<!-- Frigate-style Tabs -->
+		<Tabs bind:value={activeTab} class="w-full">
+			<TabsList class="grid w-full grid-cols-3 lg:w-[400px]">
+				<TabsTrigger value="cameras">
+					<Camera class="h-4 w-4 mr-2" />
+					Cameras
+				</TabsTrigger>
+				<TabsTrigger value="processes">
+					<Cpu class="h-4 w-4 mr-2" />
+					Processes
+				</TabsTrigger>
+				<TabsTrigger value="storage">
+					<Database class="h-4 w-4 mr-2" />
+					Storage
+				</TabsTrigger>
+			</TabsList>
+			
+			<!-- Cameras Tab (Frigate-style) -->
+			<TabsContent value="cameras">
+				<Card>
+					<CardHeader>
+						<div class="flex items-center justify-between">
+							<CardTitle>Camera Performance</CardTitle>
+							<Badge variant="secondary">
+								{stats.summary.active_cameras} active / {stats.summary.total_cameras} total
+							</Badge>
+						</div>
+					</CardHeader>
+					<CardContent>
+						{#if stats.cameras.length === 0}
+							<div class="text-center py-8 text-muted-foreground">
+								<Video class="h-12 w-12 mx-auto mb-3 opacity-50" />
+								<p>No cameras currently streaming</p>
+								<p class="text-sm">Start a live stream to see camera metrics</p>
+							</div>
+						{:else}
+							<div class="overflow-x-auto">
+								<table class="w-full text-sm">
+									<thead>
+										<tr class="border-b text-left">
+											<th class="pb-3 font-medium">Camera</th>
+											<th class="pb-3 font-medium text-right">Status</th>
+											<th class="pb-3 font-medium text-right">Input FPS</th>
+											<th class="pb-3 font-medium text-right">Process FPS</th>
+											<th class="pb-3 font-medium text-right">Detect FPS</th>
+											<th class="pb-3 font-medium text-right">Skipped</th>
+											<th class="pb-3 font-medium text-right">Inference</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each stats.cameras as cam}
+											<tr class="border-b last:border-0">
+												<td class="py-3">
+													<div class="font-medium">{cam.name || cam.id.slice(0, 8)}</div>
+													<div class="text-xs text-muted-foreground">{cam.id}</div>
+												</td>
+												<td class="py-3 text-right">
+													{#if cam.is_active}
+														<Badge class="bg-emerald-500 hover:bg-emerald-600">Active</Badge>
+													{:else}
+														<Badge variant="secondary">Inactive</Badge>
+													{/if}
+												</td>
+												<td class="py-3 text-right font-mono">{cam.input_fps?.toFixed(1) || '0.0'}</td>
+												<td class="py-3 text-right font-mono {getFpsStatus(cam.input_fps || 0, cam.process_fps || 0)}">
+													{cam.process_fps?.toFixed(1) || '0.0'}
+												</td>
+												<td class="py-3 text-right font-mono">{cam.detect_fps?.toFixed(1) || '0.0'}</td>
+												<td class="py-3 text-right">
+													{#if (cam.skipped_fps || 0) > 0}
+														<span class="text-amber-500 font-medium">{cam.skipped_fps.toFixed(1)}/s</span>
+													{:else}
+														<span class="text-muted-foreground">-</span>
+													{/if}
+												</td>
+												<td class="py-3 text-right font-mono">{cam.inference_ms?.toFixed(1) || '0.0'}ms</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+							
+							<!-- Legend -->
+							<div class="mt-4 flex gap-4 text-xs text-muted-foreground">
+								<div class="flex items-center gap-1">
+									<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+									Normal performance
+								</div>
+								<div class="flex items-center gap-1">
+									<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+									Processing lag
+								</div>
+								<div class="flex items-center gap-1">
+									<span class="w-2 h-2 rounded-full bg-red-500"></span>
+									Significant lag
+								</div>
+							</div>
+						{/if}
+					</CardContent>
+				</Card>
+			</TabsContent>
+			
+			<!-- Processes Tab -->
+			<TabsContent value="processes">
+				<Card>
+					<CardHeader>
+						<CardTitle>Process Resource Usage</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{#if !stats.system.processes || stats.system.processes.length === 0}
+							<div class="text-center py-8 text-muted-foreground">
+								<p>Process-level metrics not available</p>
+							</div>
+						{:else}
+							<div class="space-y-4">
+								{#each stats.system.processes as proc}
+									<div class="flex items-center justify-between p-3 bg-muted rounded-lg">
+										<div>
+											<div class="font-medium">{proc.name}</div>
+											<div class="text-xs text-muted-foreground">{proc.memory_mb?.toFixed(1) || 0} MB</div>
+										</div>
+										<div class="flex items-center gap-4">
+											<div class="text-right">
+												<div class="text-sm font-medium">{proc.cpu_percent?.toFixed(1) || 0}% CPU</div>
+												<div class="w-24 h-1.5 bg-secondary rounded-full mt-1">
+													<div 
+														class="h-full rounded-full {getStatusColor(proc.cpu_percent || 0)}"
+														style="width: {Math.min(proc.cpu_percent || 0, 100)}%"
+													></div>
+												</div>
+											</div>
+										</div>
+									</div>
 								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
-			</CardContent>
-		</Card>
+							</div>
+						{/if}
+					</CardContent>
+				</Card>
+			</TabsContent>
+			
+			<!-- Storage Tab (Frigate-style breakdown) -->
+			<TabsContent value="storage">
+				<Card>
+					<CardHeader>
+						<CardTitle>Storage Breakdown</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+							<!-- Total Storage -->
+							<div class="p-4 bg-muted rounded-lg">
+								<div class="flex items-center justify-between mb-2">
+									<span class="text-sm font-medium">Total Usage</span>
+									<HardDrive class="h-4 w-4 text-muted-foreground" />
+								</div>
+								<div class="text-2xl font-bold">{stats.storage?.total?.percent?.toFixed(1) || 0}%</div>
+								<div class="text-xs text-muted-foreground mt-1">
+									{stats.storage?.total?.used_gb?.toFixed(1) || 0} / {stats.storage?.total?.total_gb?.toFixed(0) || 0} GB
+								</div>
+								<div class="w-full h-2 bg-secondary rounded-full mt-3">
+									<div 
+										class="h-full rounded-full {getStatusColor(stats.storage?.total?.percent || 0)}"
+										style="width: {stats.storage?.total?.percent || 0}%"
+									></div>
+								</div>
+							</div>
+							
+							<!-- Recordings -->
+							<div class="p-4 bg-muted rounded-lg">
+								<div class="flex items-center justify-between mb-2">
+									<span class="text-sm font-medium">Recordings</span>
+									<Video class="h-4 w-4 text-muted-foreground" />
+								</div>
+								<div class="text-2xl font-bold">{stats.storage?.recordings?.size_gb?.toFixed(2) || 0} GB</div>
+								<div class="text-xs text-muted-foreground mt-1">
+									{stats.storage?.recordings?.file_count?.toLocaleString() || 0} files
+								</div>
+							</div>
+							
+							<!-- Database -->
+							<div class="p-4 bg-muted rounded-lg">
+								<div class="flex items-center justify-between mb-2">
+									<span class="text-sm font-medium">Database</span>
+									<Database class="h-4 w-4 text-muted-foreground" />
+								</div>
+								<div class="text-2xl font-bold">{stats.storage?.database?.size_mb?.toFixed(1) || 0} MB</div>
+								<div class="text-xs text-muted-foreground mt-1">
+									Events & configuration
+								</div>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			</TabsContent>
+		</Tabs>
 		
+		<!-- Prometheus Info Footer -->
 		<Card class="bg-muted/50">
 			<CardContent class="py-4">
 				<div class="flex items-center justify-between text-sm">
 					<div class="text-muted-foreground">
-						<span class="font-medium">Prometheus metrics available at:</span>
-						<code class="ml-2 bg-background px-2 py-1 rounded">/api/metrics</code>
+						<span class="font-medium">Prometheus metrics:</span>
+						<code class="ml-2 bg-background px-2 py-1 rounded text-xs">http://localhost:8000/api/metrics</code>
 					</div>
 					<a 
 						href="http://localhost:8000/api/metrics" 

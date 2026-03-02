@@ -116,14 +116,15 @@ class StreamContext:
                     except asyncio.QueueFull:
                         pass
                 
-                # Record successful frame processing
+                # Record frame processing (Frigate-style metrics)
+                has_detections = len(result.boxes) > 0
                 metrics_collector.record_camera_frame(
                     self.camera_id, 
                     processed=True,
-                    inference_ms=0  # Inference time is recorded by detector itself
+                    had_detection=has_detections
                 )
             else:
-                # Frame encoding failed
+                # Frame encoding failed - count as dropped
                 metrics_collector.record_camera_frame(
                     self.camera_id,
                     processed=False
