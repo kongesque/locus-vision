@@ -85,7 +85,8 @@ def test_archival_process(db_client):
     assert count_after == 0
     
     # Check parquet created
-    month_str = old_time.strftime('%Y_%m')
+    cutoff_date = datetime.now() - timedelta(days=30)
+    month_str = cutoff_date.strftime('%Y_%m')
     parquet_path = Path("data/archives") / f"zone_events_{month_str}.parquet"
     assert parquet_path.exists()
     
