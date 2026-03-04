@@ -53,6 +53,8 @@
 		total: { used_gb: number; total_gb: number; percent: number };
 		recordings: { size_gb: number; file_count: number };
 		database: { size_mb: number };
+		duckdb?: { size_mb: number };
+		archives?: { size_gb: number };
 		cache?: { size_mb: number };
 	}
 
@@ -455,13 +457,37 @@
 							<!-- Database -->
 							<div class="rounded-lg bg-muted p-4">
 								<div class="mb-2 flex items-center justify-between">
-									<span class="text-sm font-medium">Database</span>
+									<span class="text-sm font-medium">App DB (SQLite)</span>
 									<Database class="h-4 w-4 text-muted-foreground" />
 								</div>
 								<div class="text-2xl font-bold">
 									{stats.storage?.database?.size_mb?.toFixed(1) || 0} MB
 								</div>
-								<div class="mt-1 text-xs text-muted-foreground">Events & configuration</div>
+								<div class="mt-1 text-xs text-muted-foreground">State & configuration</div>
+							</div>
+
+							<!-- Analytics DB -->
+							<div class="rounded-lg bg-muted p-4">
+								<div class="mb-2 flex items-center justify-between">
+									<span class="text-sm font-medium">Analytics DB (DuckDB)</span>
+									<Database class="h-4 w-4 text-muted-foreground" />
+								</div>
+								<div class="text-2xl font-bold">
+									{stats.storage?.duckdb?.size_mb?.toFixed(1) || 0} MB
+								</div>
+								<div class="mt-1 text-xs text-muted-foreground">Time-series telemetry</div>
+							</div>
+
+							<!-- Archives -->
+							<div class="rounded-lg bg-muted p-4">
+								<div class="mb-2 flex items-center justify-between">
+									<span class="text-sm font-medium">Data Archives</span>
+									<Database class="h-4 w-4 text-muted-foreground" />
+								</div>
+								<div class="text-2xl font-bold">
+									{stats.storage?.archives?.size_gb?.toFixed(2) || 0} GB
+								</div>
+								<div class="mt-1 text-xs text-muted-foreground">Parquet cold storage</div>
 							</div>
 						</div>
 					</CardContent>

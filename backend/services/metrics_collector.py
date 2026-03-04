@@ -386,12 +386,33 @@ class MetricsCollector:
             except Exception:
                 pass
         
-        # Database size
+        # Database size (SQLite)
         db_size_mb = 0
         db_path = Path("backend/data/locusvision.db")
         if db_path.exists():
             try:
                 db_size_mb = db_path.stat().st_size / (1024 ** 2)
+            except Exception:
+                pass
+                
+        # DuckDB size
+        duckdb_size_mb = 0
+        duckdb_path = Path("backend/data/locus_active.duckdb")
+        if duckdb_path.exists():
+            try:
+                duckdb_size_mb = duckdb_path.stat().st_size / (1024 ** 2)
+            except Exception:
+                pass
+                
+        # Archives size
+        archives_size_gb = 0
+        archives_dir = Path("backend/data/archives")
+        if archives_dir.exists():
+            try:
+                for f in archives_dir.rglob("*"):
+                    if f.is_file():
+                        archives_size_gb += f.stat().st_size
+                archives_size_gb /= (1024 ** 3)
             except Exception:
                 pass
         
@@ -407,6 +428,12 @@ class MetricsCollector:
             },
             "database": {
                 "size_mb": round(db_size_mb, 2),
+            },
+            "duckdb": {
+                "size_mb": round(duckdb_size_mb, 2),
+            },
+            "archives": {
+                "size_gb": round(archives_size_gb, 2),
             }
         }
     
