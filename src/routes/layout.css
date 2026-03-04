@@ -126,6 +126,10 @@
     50% { transform: rotate(-180deg) scale(1.12); }
     100% { transform: rotate(-360deg) scale(1); }
   }
+  @keyframes barGrow {
+    from { transform: scaleY(0); transform-origin: bottom; }
+    to   { transform: scaleY(1); transform-origin: bottom; }
+  }
 }
 
 @layer base {

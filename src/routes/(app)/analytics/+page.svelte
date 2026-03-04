@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { Activity, Download, Calendar, Map, BarChart3, Users, Clock } from '@lucide/svelte';
+	import {
+		Activity,
+		Download,
+		Calendar,
+		Map,
+		BarChart3,
+		Users,
+		Clock,
+		TrendingUp
+	} from '@lucide/svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -11,6 +20,14 @@
 
 	let exportData = $state<any[]>([]);
 	let heatmapPoints = $state<any[]>([]);
+
+	interface PeakHoursData {
+		hours: { hour: number; count: number; avg_dwell: number }[];
+		peak_hour: number;
+		peak_count: number;
+		total_events: number;
+	}
+	let peakHoursData = $state<PeakHoursData | null>(null);
 
 	let canvasElem = $state<HTMLCanvasElement>();
 	let canvasWidth = $state(640);
@@ -23,6 +40,23 @@
 			? exportData.reduce((acc, row) => acc + (row.avg_dwell_time || 0), 0) / exportData.length
 			: 0
 	);
+	let maxHourCount = $derived(
+		peakHoursData ? Math.max(...peakHoursData.hours.map((h) => h.count), 1) : 1
+	);
+
+	function formatHour(h: number): string {
+		if (h === 0) return '12a';
+		if (h < 12) return `${h}a`;
+		if (h === 12) return '12p';
+		return `${h - 12}p`;
+	}
+
+	function formatHourLong(h: number): string {
+		if (h === 0) return '12:00 AM';
+		if (h < 12) return `${h}:00 AM`;
+		if (h === 12) return '12:00 PM';
+		return `${h - 12}:00 PM`;
+	}
 
 	async function loadAnalytics() {
 		if (!selectedCamera) return;
@@ -56,6 +90,14 @@
 				const json = await resHeatmap.json();
 				heatmapPoints = json.points || [];
 				drawHeatmap();
+			}
+
+			// 3. Fetch Peak Hours Data
+			const resPeak = await fetch(
+				`http://127.0.0.1:8000/api/analytics/peak-hours?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}`
+			);
+			if (resPeak.ok) {
+				peakHoursData = await resPeak.json();
 			}
 		} catch (e) {
 			console.error('Failed to load analytics', e);
@@ -178,7 +220,7 @@
 		</div>
 	{:else}
 		<!-- KPIs -->
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
 			<div
 				class="rounded-xl border bg-gradient-to-br from-card to-muted/50 text-card-foreground shadow transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
 			>
@@ -214,6 +256,82 @@
 					<div class="text-2xl font-bold">{exportData.length}</div>
 					<p class="text-xs text-muted-foreground">Aggregated hourly buckets</p>
 				</div>
+			</div>
+			<div
+				class="rounded-xl border bg-gradient-to-br from-amber-500/10 to-card text-card-foreground shadow transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
+			>
+				<div class="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
+					<h3 class="text-sm font-medium tracking-tight">Peak Hour</h3>
+					<TrendingUp class="h-4 w-4 text-amber-500" />
+				</div>
+				<div class="p-6 pt-0">
+					{#if peakHoursData && peakHoursData.total_events > 0}
+						<div class="text-2xl font-bold">{formatHourLong(peakHoursData.peak_hour)}</div>
+						<p class="text-xs text-muted-foreground">
+							{peakHoursData.peak_count} detections at peak
+						</p>
+					{:else}
+						<div class="text-2xl font-bold">—</div>
+						<p class="text-xs text-muted-foreground">No traffic data yet</p>
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<!-- Peak Hours Chart -->
+		<div class="rounded-xl border bg-card text-card-foreground shadow">
+			<div class="flex flex-col space-y-1.5 border-b p-6">
+				<h3 class="flex items-center gap-2 leading-none font-semibold tracking-tight">
+					<TrendingUp class="h-4 w-4 text-amber-500" /> Peak Hours Distribution
+				</h3>
+				<p class="text-sm text-muted-foreground">Zone traffic by hour of day</p>
+			</div>
+			<div class="p-6">
+				{#if peakHoursData && peakHoursData.total_events > 0}
+					<div class="flex h-[220px] items-end gap-[3px]">
+						{#each peakHoursData.hours as h (h.hour)}
+							{@const pct = (h.count / maxHourCount) * 100}
+							{@const isPeak = h.hour === peakHoursData.peak_hour}
+							<div class="group relative flex flex-1 flex-col items-center justify-end">
+								<!-- Tooltip -->
+								<div
+									class="pointer-events-none absolute -top-14 left-1/2 z-10 min-w-max -translate-x-1/2 scale-0 rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-md transition-transform group-hover:scale-100"
+								>
+									<p class="font-semibold">{formatHourLong(h.hour)}</p>
+									<p class="text-muted-foreground">
+										{h.count} detections · {h.avg_dwell.toFixed(1)}s avg
+									</p>
+								</div>
+								<!-- Bar -->
+								<div
+									class="w-full cursor-pointer rounded-t-sm transition-all duration-500 ease-out group-hover:opacity-90 {isPeak
+										? 'bg-gradient-to-t from-amber-600 to-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+										: 'bg-primary/60 group-hover:bg-primary/80'}"
+									style="height: {Math.max(
+										pct,
+										h.count > 0 ? 4 : 1
+									)}%; animation: barGrow 0.6s ease-out {h.hour * 30}ms both;"
+								></div>
+								<!-- Label -->
+								<span
+									class="mt-2 text-[10px] tabular-nums {isPeak
+										? 'font-bold text-amber-500'
+										: 'text-muted-foreground'}"
+								>
+									{formatHour(h.hour)}
+								</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="flex h-[220px] flex-col items-center justify-center text-center">
+						<BarChart3 class="mb-3 h-10 w-10 text-muted-foreground/30" />
+						<p class="text-sm text-muted-foreground">No traffic data for this period</p>
+						<p class="mt-1 text-xs text-muted-foreground">
+							Zone events will appear here once detected
+						</p>
+					</div>
+				{/if}
 			</div>
 		</div>
 

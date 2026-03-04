@@ -75,6 +75,66 @@ def export_analytics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/peak-hours")
+def get_peak_hours(
+    camera_id: Optional[str] = None,
+    zone_id: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+):
+    """
+    Aggregate zone events by hour-of-day (0–23) to identify peak traffic hours.
+    Returns per-hour counts and the single busiest hour.
+    """
+    if not start_time:
+        start_time = datetime.now() - timedelta(days=7)
+    if not end_time:
+        end_time = datetime.now()
+
+    query = """
+    SELECT
+        EXTRACT(HOUR FROM timestamp)::INTEGER AS hour,
+        COUNT(DISTINCT track_id)              AS count,
+        COALESCE(AVG(dwell_time), 0)          AS avg_dwell
+    FROM zone_events
+    WHERE timestamp >= ? AND timestamp <= ?
+    """
+    params: list = [start_time, end_time]
+
+    if camera_id:
+        query += " AND camera_id = ?"
+        params.append(camera_id)
+    if zone_id:
+        query += " AND zone_id = ?"
+        params.append(zone_id)
+
+    query += " GROUP BY hour ORDER BY hour"
+
+    try:
+        results = db_client.conn.execute(query, params).fetchall()
+
+        # Build a full 0–23 map so the frontend always gets every hour
+        hour_map = {h: {"hour": h, "count": 0, "avg_dwell": 0.0} for h in range(24)}
+        total_events = 0
+        for row in results:
+            h, cnt, dwell = int(row[0]), int(row[1]), float(row[2])
+            hour_map[h] = {"hour": h, "count": cnt, "avg_dwell": round(dwell, 2)}
+            total_events += cnt
+
+        hours = list(hour_map.values())
+        peak = max(hours, key=lambda x: x["count"])
+
+        return {
+            "hours": hours,
+            "peak_hour": peak["hour"],
+            "peak_count": peak["count"],
+            "total_events": total_events,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/heatmap")
 def get_heatmap_data(
     camera_id: str,
