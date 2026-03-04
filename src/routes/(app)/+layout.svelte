@@ -8,8 +8,10 @@
 
 <Sidebar.Provider open={data.sidebarOpen}>
 	<AppSidebar />
-	<main class="flex h-svh w-full flex-1 flex-col overflow-y-auto">
+	<main class="flex h-svh w-full flex-1 flex-col overflow-hidden">
 		<Header />
-		{@render children?.()}
+		<div class="flex-1 overflow-y-auto">
+			{@render children?.()}
+		</div>
 	</main>
 </Sidebar.Provider>

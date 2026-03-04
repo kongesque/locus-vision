@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { Home, Radio, ScanSearch, Settings, LogOut, Activity, Server } from '@lucide/svelte';
+	import { Home, Radio, ScanSearch, Settings, Activity, Server } from '@lucide/svelte';
 	import Echo from '$lib/components/svg/echo.svelte';
 </script>
 
@@ -33,25 +33,14 @@
 			</Sidebar.Menu>
 		</Sidebar.Group>
 		<Sidebar.Group>
-			<Sidebar.GroupLabel>Workspace</Sidebar.GroupLabel>
+			<Sidebar.GroupLabel>Monitor</Sidebar.GroupLabel>
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton>
+					<Sidebar.MenuButton tooltipContent="Live Stream">
 						{#snippet child({ props })}
-							<!-- TODO: Re-wire Livestream Page Link -->
 							<a href="/livestream" {...props}>
 								<Radio />
 								<span>Live Stream</span>
-							</a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent="Video Analytics">
-						{#snippet child({ props })}
-							<a href="/video-analytics" {...props}>
-								<ScanSearch />
-								<span>Video Analytics</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
@@ -66,8 +55,28 @@
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
+			</Sidebar.Menu>
+		</Sidebar.Group>
+		<Sidebar.Group>
+			<Sidebar.GroupLabel>Analyze</Sidebar.GroupLabel>
+			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent="System">
+					<Sidebar.MenuButton tooltipContent="Video Analytics">
+						{#snippet child({ props })}
+							<a href="/video-analytics" {...props}>
+								<ScanSearch />
+								<span>Video Analytics</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+			</Sidebar.Menu>
+		</Sidebar.Group>
+		<Sidebar.Group>
+			<Sidebar.GroupLabel>System</Sidebar.GroupLabel>
+			<Sidebar.Menu>
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton tooltipContent="System Status">
 						{#snippet child({ props })}
 							<a href="/system" {...props}>
 								<Server />
