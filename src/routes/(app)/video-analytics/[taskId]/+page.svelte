@@ -558,6 +558,24 @@
 					<span class="hidden sm:inline">Export Video</span>
 				</Button>
 			{/if}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					<Button variant="ghost" size="icon" class="size-8 text-muted-foreground hover:text-foreground">
+						<Settings class="size-4" />
+					</Button>
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-48">
+					<DropdownMenu.Label>Task Options</DropdownMenu.Label>
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item
+						class="text-red-600 focus:bg-red-500/10 focus:text-red-600"
+						onclick={() => (isDeleteDialogOpen = true)}
+					>
+						<Trash2 class="mr-2 size-4" />
+						Delete Task
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 		</div>
 	</header>
 

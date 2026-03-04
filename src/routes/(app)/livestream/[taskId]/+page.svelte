@@ -37,6 +37,7 @@
 		Trash2
 	} from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -487,16 +488,29 @@
 					<span class="text-xs font-medium text-red-400">REC</span>
 				</div>
 			{/if}
-			<Button
-				variant="ghost"
-				size="icon"
-				class="size-8"
-				onclick={() => {
-					isSettingsOpen = true;
-				}}
-			>
-				<Settings class="size-4" />
-			</Button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					<Button variant="ghost" size="icon" class="size-8 text-muted-foreground hover:text-foreground">
+						<Settings class="size-4" />
+					</Button>
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-48">
+					<DropdownMenu.Label>Camera Options</DropdownMenu.Label>
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item onclick={() => (isSettingsOpen = true)}>
+						<Settings class="mr-2 size-4" />
+						Settings
+					</DropdownMenu.Item>
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item
+						class="text-red-600 focus:bg-red-500/10 focus:text-red-600"
+						onclick={() => (isDeleteDialogOpen = true)}
+					>
+						<Trash2 class="mr-2 size-4" />
+						Delete Camera
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 		</div>
 	</header>
 
@@ -949,32 +963,17 @@
 			</div>
 		</div>
 
-		<Dialog.Footer class="gap-2 sm:gap-0">
-			<div class="flex w-full flex-col gap-2 sm:flex-row sm:justify-between">
-				<Button
-					variant="ghost"
-					class="text-red-600 hover:bg-red-500/10 hover:text-red-600"
-					onclick={() => {
-						isSettingsOpen = false;
-						isDeleteDialogOpen = true;
-					}}
-				>
-					<Trash2 class="mr-2 size-4" />
-					Delete Camera
-				</Button>
-				<div class="flex gap-2">
-					<Button variant="outline" onclick={() => (isSettingsOpen = false)}>Cancel</Button>
-					<Button onclick={saveSettings} disabled={isSaving}>
-						{#if isSaving}
-							<Loader2 class="mr-2 size-4 animate-spin" />
-							Saving...
-						{:else}
-							<Check class="mr-2 size-4" />
-							Save Changes
-						{/if}
-					</Button>
-				</div>
-			</div>
+		<Dialog.Footer class="gap-2 sm:justify-end">
+			<Button variant="outline" onclick={() => (isSettingsOpen = false)}>Cancel</Button>
+			<Button onclick={saveSettings} disabled={isSaving}>
+				{#if isSaving}
+					<Loader2 class="mr-2 size-4 animate-spin" />
+					Saving...
+				{:else}
+					<Check class="mr-2 size-4" />
+					Save Changes
+				{/if}
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
