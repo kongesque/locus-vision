@@ -24,15 +24,4 @@
 		<SidebarTrigger class={cn('-ml-2.5', sidebar.open ? 'cursor-w-resize' : 'cursor-e-resize')} />
 		<PageTitle />
 	</div>
-	<div class="flex items-center gap-2">
-		<Button
-			variant="outline"
-			size="sm"
-			href="https://www.kongesque.com"
-			target="_blank"
-			rel="noopener noreferrer"
-		>
-			Docs
-		</Button>
-	</div>
 </header>
