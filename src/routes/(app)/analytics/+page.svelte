@@ -173,7 +173,7 @@
 	<title>Historical Analytics · Locus</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6 p-6">
+<div class="relative flex flex-1 flex-col gap-4 p-4">
 	<!-- Header -->
 	<div class="flex flex-col justify-between gap-4 md:flex-row md:items-center">
 		<div>

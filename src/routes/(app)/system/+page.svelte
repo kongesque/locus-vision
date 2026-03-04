@@ -129,7 +129,7 @@
 	}
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="relative flex flex-1 flex-col gap-4 p-4">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
