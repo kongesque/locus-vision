@@ -46,10 +46,6 @@
 		if (refreshTimer) clearInterval(refreshTimer);
 	});
 
-	function handleDownload() {
-		console.log('Download');
-	}
-
 	function openDeleteDialog(task: any) {
 		taskToDelete = task;
 		deleteError = '';
@@ -108,7 +104,6 @@
 						status={item.status}
 						progress={item.progress || 0}
 						thumbnail={`http://127.0.0.1:8000/api/video/${item.id}/thumbnail`}
-						onDownload={handleDownload}
 						onDelete={() => openDeleteDialog(item)}
 					/>
 				{/each}

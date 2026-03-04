@@ -2,7 +2,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Download, MoreVertical, Trash2, Clock, CheckCircle2, AlertCircle } from '@lucide/svelte';
+	import { MoreVertical, Trash2, Clock, CheckCircle2, AlertCircle } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 
 	interface Props {
@@ -14,7 +14,6 @@
 		format: string;
 		status?: string;
 		progress?: number;
-		onDownload?: () => void;
 		onDelete?: () => void;
 	}
 
@@ -27,7 +26,6 @@
 		format,
 		status = 'completed',
 		progress = 0,
-		onDownload,
 		onDelete
 	}: Props = $props();
 
@@ -135,10 +133,6 @@
 					{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="end">
-					<DropdownMenu.Item onclick={onDownload}>
-						<Download class="mr-2 h-4 w-4" />
-						Download
-					</DropdownMenu.Item>
 					<DropdownMenu.Item class="text-destructive focus:text-destructive" onclick={onDelete}>
 						<Trash2 class="mr-2 h-4 w-4" />
 						Delete
