@@ -442,7 +442,9 @@
 		fetch('http://localhost:8000/api/system/storage')
 			.then((res) => res.json())
 			.then((data) => {
-				storageGbFree = data.recordings_free_gb.toFixed(1);
+				if (data.total) {
+					storageGbFree = (data.total.total_gb - data.total.used_gb).toFixed(1);
+				}
 			})
 			.catch((err) => console.error('Failed to load storage stats:', err));
 
