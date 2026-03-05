@@ -60,7 +60,7 @@
 	let fps = $state(0);
 	let errorMsg = $state<string | null>(null);
 	let uptime = $state('00:00:00');
-	let startTime = $state(Date.now());
+	let startTime = $state<number | null>(null);
 	let storageGbFree = $state('...');
 	let isSaving = $state(false);
 	let isSettingsOpen = $state(false);
@@ -433,8 +433,86 @@
 	}
 
 	// ─── Lifecycle ───
+	// ─── Fetch initial state from server (NVR-style persistence) ───
+	async function fetchStreamStatus() {
+		try {
+			const res = await fetch(`http://localhost:8000/api/livestream/${taskId}/status`);
+			if (res.ok) {
+				const data = await res.json();
+				if (data.started_at) {
+					startTime = data.started_at * 1000; // Convert to ms
+				}
+			}
+		} catch {
+			// Stream may not be active yet
+		}
+	}
+
+	async function fetchFpsNow() {
+		try {
+			const res = await fetch('http://localhost:8000/api/system/cameras');
+			if (res.ok) {
+				const data = await res.json();
+				if (data.cameras) {
+					const camStats = data.cameras.find((c: any) => c.id === taskId);
+					if (camStats) {
+						fps = camStats.detect_fps;
+					}
+				}
+			}
+		} catch {
+			// silent
+		}
+	}
+
+	async function fetchRecentEvents() {
+		try {
+			const res = await fetch(
+				`http://localhost:8000/api/livestream/${taskId}/recent-events?limit=100`
+			);
+			if (res.ok) {
+				const data = await res.json();
+				if (data.events && data.events.length > 0) {
+					const mapped = data.events.map(
+						(ev: { type: string; message: string; zone?: string; timestamp?: number }) => {
+							const evTime = ev.timestamp
+								? new Date(ev.timestamp * 1000)
+								: new Date();
+							const severity = classifySeverity(ev.type);
+							return {
+								id: crypto.randomUUID(),
+								time: evTime.toLocaleTimeString([], {
+									hour12: false,
+									hour: '2-digit',
+									minute: '2-digit',
+									second: '2-digit'
+								}),
+								message: ev.message,
+								type: ev.type,
+								zone: ev.zone,
+								severity
+							} as ActivityEvent;
+						}
+					);
+					activityLogs = mapped;
+					// Rebuild event counts from loaded history
+					const counts: Record<string, number> = {};
+					for (const ev of mapped) {
+						counts[ev.type] = (counts[ev.type] || 0) + 1;
+					}
+					eventCounts = counts;
+				}
+			}
+		} catch {
+			// Activity feed will just start empty
+		}
+	}
+
 	onMount(() => {
-		startTime = Date.now();
+		// NVR-style: fetch server-side state first (uptime, FPS, recent events)
+		fetchStreamStatus();
+		fetchFpsNow();
+		fetchRecentEvents();
 		fetchCameraInfo();
 		fetchAvailableModels();
 
@@ -451,25 +529,17 @@
 		clockInterval = setInterval(() => {
 			currentTime = new Date();
 
-			// Calculate uptime
-			const diffSeconds = Math.floor((Date.now() - startTime) / 1000);
-			const h = Math.floor(diffSeconds / 3600);
-			const m = Math.floor((diffSeconds % 3600) / 60);
-			const s = diffSeconds % 60;
-			uptime = [h, m, s].map((v) => v.toString().padStart(2, '0')).join(':');
+			// Calculate uptime from server-side start time (NVR-style)
+			if (startTime) {
+				const diffSeconds = Math.floor((Date.now() - startTime) / 1000);
+				const h = Math.floor(diffSeconds / 3600);
+				const m = Math.floor((diffSeconds % 3600) / 60);
+				const s = diffSeconds % 60;
+				uptime = [h, m, s].map((v) => v.toString().padStart(2, '0')).join(':');
+			}
 
 			// Poll FPS from system metrics
-			fetch('http://localhost:8000/api/system/cameras')
-				.then((res) => res.json())
-				.then((data) => {
-					if (data.cameras) {
-						const camStats = data.cameras.find((c: any) => c.id === taskId);
-						if (camStats) {
-							fps = camStats.detect_fps;
-						}
-					}
-				})
-				.catch(() => {});
+			fetchFpsNow();
 		}, 5000); // Poll metrics and update uptime every 5s
 
 		document.addEventListener('fullscreenchange', handleFullscreenChange);

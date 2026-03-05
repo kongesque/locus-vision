@@ -6,6 +6,7 @@ Also buffers telemetry events and flushes them to DuckDB for analytics.
 """
 
 import asyncio
+import collections
 import threading
 import time
 import json
@@ -51,6 +52,12 @@ class StreamContext:
         self._thread = None
         self._frame_count = 0
         
+        # Stream uptime tracking (NVR-style — survives page refreshes)
+        self.started_at = time.time()
+
+        # Server-side event ring buffer (NVR-style — recent events survive page refreshes)
+        self.recent_events = collections.deque(maxlen=200)
+
         # Telemetry Buffers for DuckDB
         self.zone_events_buffer = []
         self.line_events_buffer = []
@@ -248,6 +255,9 @@ class StreamContext:
                     self._track_zones.pop(k, None)
                 
             for ev in ws_events:
+                # Buffer event server-side for replay on page refresh (NVR-style)
+                if ev.get("type") != "zone_update":
+                    self.recent_events.append(ev)
                 for q in self.event_clients:
                     try: q.put_nowait(json.dumps(ev))
                     except asyncio.QueueFull: pass

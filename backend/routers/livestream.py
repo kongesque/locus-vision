@@ -99,3 +99,45 @@ async def sse_events(camera_id: str, request: Request):
             stream_ctx.event_clients.remove(client_queue)
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+
+@router.get("/{camera_id}/status")
+async def stream_status(camera_id: str):
+    """
+    Get the current stream status including uptime (NVR-style).
+    Returns server-side start time so uptime persists across page refreshes.
+    """
+    import time
+    mgr = livestream_manager
+    with mgr.lock:
+        ctx = mgr.active_streams.get(camera_id)
+
+    if not ctx:
+        return {"is_active": False, "started_at": None, "uptime_seconds": 0}
+
+    now = time.time()
+    return {
+        "is_active": ctx._running,
+        "started_at": ctx.started_at,
+        "uptime_seconds": round(now - ctx.started_at),
+    }
+
+
+@router.get("/{camera_id}/recent-events")
+async def recent_events(camera_id: str, limit: int = 50):
+    """
+    Get recent detection events from the server-side ring buffer (NVR-style).
+    Events persist across page refreshes so the Activity Feed is never empty.
+    """
+    limit = min(max(limit, 1), 200)
+    mgr = livestream_manager
+    with mgr.lock:
+        ctx = mgr.active_streams.get(camera_id)
+
+    if not ctx:
+        return {"events": []}
+
+    # Return the most recent `limit` events (newest first)
+    events = list(ctx.recent_events)[-limit:]
+    events.reverse()
+    return {"events": events}
