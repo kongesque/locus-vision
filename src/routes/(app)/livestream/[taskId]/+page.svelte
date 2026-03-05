@@ -41,9 +41,19 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import LiveHeatmap from '$lib/components/livestream/live-heatmap.svelte';
 	import { onMount, onDestroy } from 'svelte';
 
 	const taskId = $derived($page.params.taskId);
+
+	interface Point {
+		x: number;
+		y: number;
+		timestamp: number;
+	}
+
+	let heatmapPoints = $state<Point[]>([]);
+	let showHeatmap = $state(false);
 
 	// ─── Camera State (loaded from backend) ───
 	let cameraName = $state('Loading...');
@@ -301,6 +311,15 @@
 					} else {
 						// Regular detection event — add to activity log
 						addActivityLog(data.message, data.type, data.zone);
+
+						// Add heatmap point if available
+						if (data.point && data.point.x && data.point.y) {
+							heatmapPoints.push({
+								x: data.point.x,
+								y: data.point.y,
+								timestamp: data.timestamp ? data.timestamp * 1000 : Date.now()
+							});
+						}
 					}
 				} catch (e) {
 					console.error('Failed to parse SSE event:', e);
@@ -490,7 +509,11 @@
 			{/if}
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
-					<Button variant="ghost" size="icon" class="size-8 text-muted-foreground hover:text-foreground">
+					<Button
+						variant="ghost"
+						size="icon"
+						class="size-8 text-muted-foreground hover:text-foreground"
+					>
 						<Settings class="size-4" />
 					</Button>
 				</DropdownMenu.Trigger>
@@ -563,6 +586,15 @@
 						<div
 							class="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]"
 						></div>
+
+						{#if videoWidth > 0 && videoHeight > 0}
+							<LiveHeatmap
+								points={heatmapPoints}
+								width={videoWidth}
+								height={videoHeight}
+								show={showHeatmap}
+							/>
+						{/if}
 					</div>
 
 					<!-- Canvas overlay for detection boxes -->
@@ -701,6 +733,16 @@
 						</button>
 					</div>
 					<div class="flex items-center gap-1">
+						<button
+							onclick={() => (showHeatmap = !showHeatmap)}
+							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 {showHeatmap
+								? 'text-fuchsia-400'
+								: 'text-white/80'}"
+							title="Toggle Heatmap"
+						>
+							<Activity class="size-4" />
+							<span class="hidden sm:inline">Heatmap</span>
+						</button>
 						<button
 							onclick={() => (showPTZ = !showPTZ)}
 							class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 {showPTZ

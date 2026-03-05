@@ -163,7 +163,9 @@ class StreamContext:
                     "message": f"{box['label']} detected{dwell_str}",
                     "zone": zone_name,
                     "timestamp": current_time,
+                    "point": {"x": box["x"] + box["w"] / 2, "y": box["y"] + box["h"]}, # Bottom center point
                 })
+
                 
             # Analytics alerts (wrong_way, capacity_warning)
             for alert in result.alerts:
