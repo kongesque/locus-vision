@@ -347,29 +347,6 @@ async def update_app_settings(
     allow_signup = await get_app_setting("allow_signup", "false")
     return AppSettingsResponse(allow_signup=allow_signup == "true")
 
-@router.get("/api/admin/system/storage")
-async def get_storage_stats(admin: dict = Depends(_require_admin)):
-    """Admin only: Get system storage stats."""
-    try:
-        # We check the disk usage of the data directory where videos/models are stored
-        target_dir = "data"
-        if not os.path.exists(target_dir):
-            os.makedirs(target_dir, exist_ok=True)
-            
-        total, used, free = shutil.disk_usage(target_dir)
-        return {
-            "total": total,
-            "used": used,
-            "free": free,
-            "percent_used": (used / total) * 100 if total > 0 else 0
-        }
-    except Exception as e:
-        logging.error(f"Error getting storage stats: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve storage statistics."
-        )
-
 @router.delete("/api/admin/media", response_model=MessageResponse)
 async def delete_all_media(admin: dict = Depends(_require_admin)):
     """Admin only: Delete all video tasks and physical media files."""

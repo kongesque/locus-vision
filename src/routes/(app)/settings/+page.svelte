@@ -299,41 +299,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- SYSTEM STORAGE -->
-		<Card.Root>
-			<Card.Header>
-				<Card.Title class="text-lg">System Storage</Card.Title>
-				<Card.Description>Disk usage of the host server</Card.Description>
-			</Card.Header>
-			<Card.Content>
-				{#if data.storageStats}
-					{@const usedGB = (data.storageStats.used / 1073741824).toFixed(1)}
-					{@const totalGB = (data.storageStats.total / 1073741824).toFixed(1)}
-					{@const freeGB = (data.storageStats.free / 1073741824).toFixed(1)}
-					{@const percent = Math.round(data.storageStats.percent_used)}
-					<div class="space-y-3">
-						<div class="flex justify-between text-sm">
-							<span class="font-medium">{usedGB} GB used</span>
-							<span class="text-muted-foreground">{freeGB} GB free</span>
-						</div>
-						<div class="h-4 w-full overflow-hidden rounded-full bg-secondary">
-							<div
-								class="h-full bg-primary transition-all duration-500 {percent > 90
-									? 'bg-destructive'
-									: ''}"
-								style="width: {percent}%"
-							></div>
-						</div>
-						<p class="mt-1 text-xs text-muted-foreground">
-							{percent}% capacity • {totalGB} GB total capacity
-						</p>
-					</div>
-				{:else}
-					<p class="text-sm text-muted-foreground">Unable to fetch storage statistics.</p>
-				{/if}
-			</Card.Content>
-		</Card.Root>
-
 		<!-- DATA MANAGEMENT -->
 		<Card.Root>
 			<Card.Header>
@@ -353,6 +318,21 @@
 						this data.
 					</p>
 				</div>
+
+				<!-- Storage Metrics Link -->
+				<a
+					href="/system"
+					class="mb-4 flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted"
+				>
+					<div class="space-y-0.5">
+						<Label class="text-sm font-medium cursor-pointer">Storage Metrics</Label>
+						<p class="text-sm text-muted-foreground">
+							View disk usage, recordings, and database sizes
+						</p>
+					</div>
+					<span class="text-muted-foreground">→</span>
+				</a>
+
 				<div class="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
 					<div class="space-y-0.5">
 						<Label class="text-sm font-medium">Clear All Media</Label>
