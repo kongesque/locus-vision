@@ -502,9 +502,11 @@
 	<title>{task ? task.filename : 'Task Result'} · Locus</title>
 </svelte:head>
 
-<div class="flex flex-1 flex-col overflow-hidden">
+<div class="flex h-full flex-col overflow-hidden">
 	<!-- ─── Header Bar ─── -->
-	<header class="flex items-center justify-between border-b bg-card/50 px-4 py-3 backdrop-blur-sm">
+	<header
+		class="flex shrink-0 items-center justify-between border-b bg-card/50 px-3 py-2 backdrop-blur-sm"
+	>
 		<div class="flex items-center gap-3">
 			<Button variant="ghost" size="icon" href="/video-analytics" class="shrink-0">
 				<ChevronLeft class="size-4" />
@@ -560,7 +562,11 @@
 			{/if}
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
-					<Button variant="ghost" size="icon" class="size-8 text-muted-foreground hover:text-foreground">
+					<Button
+						variant="ghost"
+						size="icon"
+						class="size-8 text-muted-foreground hover:text-foreground"
+					>
 						<Settings class="size-4" />
 					</Button>
 				</DropdownMenu.Trigger>
@@ -589,15 +595,15 @@
 	{/if}
 
 	<!-- ─── Main Content ─── -->
-	<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4 lg:flex-row">
+	<div class="flex min-h-0 flex-1 gap-3 overflow-hidden p-3 lg:flex-row">
 		<!-- Left: Video + Timeline + Stats -->
-		<div class="flex min-w-0 flex-1 flex-col gap-4">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
 			<!-- Video Player -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				bind:this={videoContainer}
-				class="group relative flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-black shadow-xl"
-				style={isFullscreen ? 'height: 100vh;' : 'height: calc(100vh - 18rem); min-height: 24rem;'}
+				class="group relative flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-black shadow-xl"
+				style={isFullscreen ? 'height: 100vh;' : ''}
 				onmousemove={handleVideoMouseMove}
 				onmouseleave={handleVideoMouseLeave}
 			>
@@ -729,13 +735,13 @@
 
 			<!-- ─── Activity Timeline ─── -->
 			{#if status === 'ready' && timelineData.length > 0}
-				<div class="overflow-hidden rounded-xl border bg-card shadow-sm">
-					<div class="flex items-center justify-between border-b px-4 py-3">
+				<div class="shrink-0 overflow-hidden rounded-lg border bg-card shadow-sm">
+					<div class="flex items-center justify-between border-b px-3 py-1.5">
 						<div class="flex items-center gap-2">
-							<Activity class="size-4 text-blue-400" />
-							<h3 class="text-sm font-semibold tracking-tight">Activity Timeline</h3>
+							<Activity class="size-3 text-blue-400" />
+							<h3 class="text-[11px] font-semibold tracking-tight">Activity Timeline</h3>
 						</div>
-						<div class="flex items-center gap-3 text-xs text-muted-foreground">
+						<div class="flex items-center gap-3 text-[10px] text-muted-foreground">
 							{#if hoveredTime !== null}
 								<span class="font-mono text-blue-400">
 									{formatTime(hoveredTime)} · {hoveredCount} objects
@@ -748,10 +754,10 @@
 
 					<!-- ─── Filter Controls ─── -->
 					{#if availableClasses.length > 0}
-						<div class="flex items-center gap-1.5 overflow-x-auto border-b bg-muted/5 px-4 py-2">
+						<div class="flex items-center gap-1.5 overflow-x-auto border-b bg-muted/5 px-3 py-1">
 							<button
 								onclick={() => (activeClassFilter = 'all')}
-								class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors {activeClassFilter ===
+								class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors {activeClassFilter ===
 								'all'
 									? 'bg-primary text-primary-foreground'
 									: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
@@ -761,7 +767,7 @@
 							{#each availableClasses as cls}
 								<button
 									onclick={() => (activeClassFilter = cls)}
-									class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-colors {activeClassFilter ===
+									class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium capitalize transition-colors {activeClassFilter ===
 									cls
 										? 'bg-primary text-primary-foreground'
 										: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
@@ -772,10 +778,10 @@
 						</div>
 					{/if}
 
-					<div class="p-3">
+					<div class="px-2 py-1">
 						<canvas
 							bind:this={timelineCanvas}
-							class="h-[120px] w-full cursor-crosshair rounded"
+							class="h-[80px] w-full cursor-crosshair rounded"
 							onclick={handleTimelineClick}
 							onmousemove={handleTimelineHover}
 							onmouseleave={handleTimelineLeave}
@@ -785,56 +791,36 @@
 				</div>
 			{/if}
 
-			<!-- ─── Stats Cards ─── -->
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				<div
-					class="group rounded-xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/20"
-				>
-					<div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-						<Shield class="size-3.5 text-blue-400" />
-						Detection Model
-					</div>
-					<div class="mt-1.5 text-sm font-semibold tracking-tight">
-						{task ? task.model_name || 'yolo11n' : '—'}
-					</div>
+			<!-- ─── Stats Strip ─── -->
+			<div
+				class="flex shrink-0 items-center gap-3 overflow-x-auto rounded-lg border bg-card/60 px-3 py-1.5 backdrop-blur-sm"
+			>
+				<div class="flex shrink-0 items-center gap-1.5">
+					<Shield class="size-3 text-blue-400" />
+					<span class="text-[11px] text-muted-foreground">Model</span>
+					<span class="text-[11px] font-semibold">{task ? task.model_name || 'yolo11n' : '—'}</span>
 				</div>
-				<div
-					class="group rounded-xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/20"
-				>
-					<div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-						<Clock class="size-3.5 text-purple-400" />
-						Duration
-					</div>
-					<div class="mt-1.5 text-sm font-semibold tracking-tight">
-						{task ? task.duration || '--:--' : '--:--'}
-					</div>
+				<span class="text-border">│</span>
+				<div class="flex shrink-0 items-center gap-1.5">
+					<Clock class="size-3 text-purple-400" />
+					<span class="text-[11px] font-semibold">{task ? task.duration || '--:--' : '--:--'}</span>
 				</div>
-				<div
-					class="group rounded-xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/20"
-				>
-					<div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-						<HardDrive class="size-3.5 text-amber-400" />
-						Processing
-					</div>
-					<div class="mt-1.5 text-sm font-semibold tracking-tight">12 FPS · DeepSort</div>
+				<span class="text-border">│</span>
+				<div class="flex shrink-0 items-center gap-1.5">
+					<HardDrive class="size-3 text-amber-400" />
+					<span class="text-[11px] font-semibold">12 FPS · DeepSort</span>
 				</div>
-				<div
-					class="group rounded-xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/20"
-				>
-					<div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-						<Layers class="size-3.5 text-emerald-400" />
-						Status
-					</div>
-					<div class="mt-1.5 text-sm font-semibold tracking-tight capitalize">
-						{statusLabel}
-					</div>
+				<span class="text-border">│</span>
+				<div class="flex shrink-0 items-center gap-1.5">
+					<Layers class="size-3 text-emerald-400" />
+					<span class="text-[11px] font-semibold capitalize">{statusLabel}</span>
 				</div>
 			</div>
 		</div>
 
 		<!-- ─── Right Sidebar: Detection Summary ─── -->
-		<div class="flex w-full flex-col lg:w-80 xl:w-96">
-			<div class="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+		<div class="hidden min-h-0 w-80 shrink-0 flex-col lg:flex xl:w-96">
+			<div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
 				<!-- Summary header -->
 				<div class="border-b px-4 py-3">
 					<div class="flex items-center gap-2">
@@ -919,7 +905,9 @@
 	</div>
 
 	<!-- ─── Footer ─── -->
-	<footer class="flex items-center justify-between border-t bg-card/50 px-4 py-2 backdrop-blur-sm">
+	<footer
+		class="flex shrink-0 items-center justify-between border-t bg-card/50 px-3 py-1.5 backdrop-blur-sm"
+	>
 		<div class="flex items-center gap-4">
 			<div class="flex items-center gap-1.5">
 				<span
@@ -954,8 +942,8 @@
 				Delete Task
 			</Dialog.Title>
 			<Dialog.Description>
-				Are you sure you want to delete <strong>{task?.filename || 'this task'}</strong>? This action
-				cannot be undone.
+				Are you sure you want to delete <strong>{task?.filename || 'this task'}</strong>? This
+				action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>
 		<Dialog.Footer class="gap-2 sm:justify-end">
