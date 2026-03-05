@@ -57,6 +57,12 @@ class StreamContext:
         self.track_events_buffer = []
         self._last_db_flush = time.time()
 
+        # SSE Event Throttling — only emit meaningful state changes
+        self._known_tracks = set()           # track IDs we've announced
+        self._track_last_event = {}          # track_id -> last SSE emit time
+        self._track_zones = {}               # track_id -> last known zone
+        self._sse_cooldown = 5.0             # seconds between dwell updates per track
+
     def start(self):
         self._running = True
         metrics_collector.register_camera(self.camera_id)
@@ -151,23 +157,75 @@ class StreamContext:
             else:
                 metrics_collector.record_camera_frame(self.camera_id, processed=False)
 
-            # Generate real-time events for SSE
+            # Generate real-time events for SSE (throttled, NVR-style)
             ws_events = []
             
-            # Simple object detection events
+            # Intelligent per-track event emission
             for box in result.boxes:
+                track_id = box.get("track_id")
+                label = box["label"]
                 zone_name = box.get("in_zone", "Camera View") or "Camera View"
-                dwell_str = f" (Dwell: {box.get('dwell_time', 0.0):.1f}s)" if box.get("dwell_time") else ""
-                ws_events.append({
-                    "type": box["label"].lower(),
-                    "message": f"{box['label']} detected{dwell_str}",
-                    "zone": zone_name,
-                    "timestamp": current_time,
-                    "point": {"x": box["x"] + box["w"] / 2, "y": box["y"] + box["h"]}, # Bottom center point
-                })
-
+                dwell_time = box.get("dwell_time", 0.0)
+                point = {"x": box["x"] + box["w"] / 2, "y": box["y"] + box["h"]}
                 
-            # Analytics alerts (wrong_way, capacity_warning)
+                # Always send heatmap points (lightweight, no log entry)
+                # but only emit activity log events on state changes
+                
+                if track_id is not None:
+                    # 1) New track — object just appeared
+                    if track_id not in self._known_tracks:
+                        self._known_tracks.add(track_id)
+                        self._track_last_event[track_id] = current_time
+                        self._track_zones[track_id] = zone_name
+                        ws_events.append({
+                            "type": label.lower(),
+                            "message": f"{label} entered {zone_name}",
+                            "zone": zone_name,
+                            "timestamp": current_time,
+                            "point": point,
+                        })
+                        continue
+                    
+                    # 2) Zone transition — object moved between zones
+                    prev_zone = self._track_zones.get(track_id)
+                    if prev_zone and prev_zone != zone_name:
+                        self._track_zones[track_id] = zone_name
+                        self._track_last_event[track_id] = current_time
+                        ws_events.append({
+                            "type": "zone",
+                            "message": f"{label} moved from {prev_zone} to {zone_name}",
+                            "zone": zone_name,
+                            "timestamp": current_time,
+                            "point": point,
+                        })
+                        continue
+                    
+                    # 3) Dwell heartbeat — update every N seconds
+                    last_emit = self._track_last_event.get(track_id, 0)
+                    if current_time - last_emit >= self._sse_cooldown and dwell_time > 0:
+                        self._track_last_event[track_id] = current_time
+                        ws_events.append({
+                            "type": label.lower(),
+                            "message": f"{label} in {zone_name} · {dwell_time:.0f}s",
+                            "zone": zone_name,
+                            "timestamp": current_time,
+                            "point": point,
+                        })
+                else:
+                    # No track_id (untracked detection) — throttle globally by label
+                    throttle_key = f"__untracked_{label.lower()}"
+                    last_emit = self._track_last_event.get(throttle_key, 0)
+                    if current_time - last_emit >= self._sse_cooldown:
+                        self._track_last_event[throttle_key] = current_time
+                        ws_events.append({
+                            "type": label.lower(),
+                            "message": f"{label} detected in {zone_name}",
+                            "zone": zone_name,
+                            "timestamp": current_time,
+                            "point": point,
+                        })
+
+            # Analytics alerts — always emit immediately (high priority)
             for alert in result.alerts:
                 ws_events.append(alert)
                 
@@ -179,6 +237,15 @@ class StreamContext:
                     "total_count": result.total_count,
                     "timestamp": current_time,
                 })
+
+            # Garbage-collect stale tracks from throttle state (every 30s)
+            if self._frame_count % 450 == 0:  # ~30s at 15fps
+                stale_cutoff = current_time - 30.0
+                stale_ids = [k for k, v in self._track_last_event.items() if v < stale_cutoff]
+                for k in stale_ids:
+                    self._track_last_event.pop(k, None)
+                    self._known_tracks.discard(k)
+                    self._track_zones.pop(k, None)
                 
             for ev in ws_events:
                 for q in self.event_clients:
