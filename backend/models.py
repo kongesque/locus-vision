@@ -144,6 +144,7 @@ class VideoTask(BaseModel):
     duration: str | None = None
     format: str | None = None
     model_name: str | None = None
+    fps: int | None = 12
     total_count: int | None = None
     zone_counts: str | None = None
     zones: str | None = None
@@ -162,6 +163,7 @@ class CameraCreate(BaseModel):
     url: str | None = None
     device_id: str | None = None
     model_name: str = "yolo11n"
+    fps: int = 24
     zones: str | None = None
     classes: str | None = None
 
@@ -172,6 +174,7 @@ class CameraUpdate(BaseModel):
     url: str | None = None
     device_id: str | None = None
     model_name: str | None = None
+    fps: int | None = None
     status: str | None = None
     zones: str | None = None
     classes: str | None = None
@@ -184,6 +187,7 @@ class CameraResponse(BaseModel):
     url: str | None = None
     device_id: str | None = None
     model_name: str
+    fps: int = 24
     status: str
     zones: str | None = None
     classes: str | None = None

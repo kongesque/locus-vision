@@ -22,7 +22,7 @@ class LivestreamManager:
         self.active_streams = {}  # camera_id -> StreamContext
         self.lock = threading.Lock()
 
-    def get_or_create_stream(self, camera_id: str, zones=None, classes=None, model_name="yolo11n"):
+    def get_or_create_stream(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24):
         with self.lock:
             if camera_id not in self.active_streams:
                 self.active_streams[camera_id] = StreamContext(
@@ -30,13 +30,15 @@ class LivestreamManager:
                     zones=zones,
                     classes=classes,
                     model_name=model_name,
+                    fps=fps,
                 )
                 self.active_streams[camera_id].start()
             return self.active_streams[camera_id]
 
 class StreamContext:
-    def __init__(self, camera_id: str, zones=None, classes=None, model_name="yolo11n"):
+    def __init__(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24):
         self.camera_id = camera_id
+        self.target_fps = fps
         self.video_clients = []
         self.event_clients = []
         
@@ -104,7 +106,7 @@ class StreamContext:
             self._dummy_loop()
             return
 
-        target_fps = 15
+        target_fps = self.target_fps
         frame_interval = 1.0 / target_fps
         frame_times = []
 

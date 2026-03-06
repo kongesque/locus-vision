@@ -63,6 +63,7 @@ async def init_db():
                 duration      TEXT    NULL,
                 format        TEXT    NULL,
                 model_name    TEXT    NULL,
+                fps           INTEGER NULL DEFAULT 12,
                 total_count   INTEGER NULL,
                 zone_counts   TEXT    NULL,
                 zones         TEXT    NULL,
@@ -77,6 +78,7 @@ async def init_db():
                 url         TEXT    NULL,
                 device_id   TEXT    NULL,
                 model_name  TEXT    NOT NULL DEFAULT 'yolo11n',
+                fps         INTEGER NOT NULL DEFAULT 24,
                 status      TEXT    NOT NULL DEFAULT 'active',
                 zones       TEXT    NULL,
                 classes     TEXT    NULL,
@@ -97,6 +99,7 @@ async def init_db():
                 "classes": "ALTER TABLE video_tasks ADD COLUMN classes TEXT NULL",
                 "error_message": "ALTER TABLE video_tasks ADD COLUMN error_message TEXT NULL",
                 "name": "ALTER TABLE video_tasks ADD COLUMN name TEXT NULL",
+                "fps": "ALTER TABLE video_tasks ADD COLUMN fps INTEGER NULL DEFAULT 12",
             }
             for col_name, sql in migrations.items():
                 if col_name not in columns:
@@ -109,9 +112,14 @@ async def init_db():
         try:
             cursor = await db.execute("PRAGMA table_info(cameras)")
             columns = [row[1] for row in await cursor.fetchall()]
-            if "updated_at" not in columns:
-                await db.execute("ALTER TABLE cameras ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
-                await db.commit()
+            camera_migrations = {
+                "updated_at": "ALTER TABLE cameras ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
+                "fps": "ALTER TABLE cameras ADD COLUMN fps INTEGER NOT NULL DEFAULT 24",
+            }
+            for col_name, sql in camera_migrations.items():
+                if col_name not in columns:
+                    await db.execute(sql)
+            await db.commit()
         except Exception as e:
             print(f"Migration warning (cameras): {e}")
 

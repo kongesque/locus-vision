@@ -23,8 +23,9 @@ async def process_video(
     task_id: str,
     video: UploadFile = File(...),
     zones: str = Form("[]"),
-    model: str = Form("yolo11n"),
+    model_name: str = Form("yolo11n"),
     classes: str = Form("[]"),
+    fps: int = Form(12),
 ):
     """
     Upload a video and enqueue it for background processing.
@@ -46,9 +47,9 @@ async def process_video(
     try:
         await db.execute(
             """INSERT OR REPLACE INTO video_tasks
-               (id, filename, status, progress, model_name, zones, classes)
-               VALUES (?, ?, 'pending', 0, ?, ?, ?)""",
-            (task_id, video.filename, model, json.dumps(zones_data), json.dumps(classes_data)),
+               (id, filename, status, progress, model_name, fps, zones, classes)
+               VALUES (?, ?, 'pending', 0, ?, ?, ?, ?)""",
+            (task_id, video.filename, model_name, fps, json.dumps(zones_data), json.dumps(classes_data)),
         )
         await db.commit()
     finally:

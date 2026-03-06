@@ -184,7 +184,7 @@ class VideoJobQueue:
         classes_raw = task.get("classes") or "[]"
         full_frame_classes = json.loads(classes_raw) if isinstance(classes_raw, str) else classes_raw
 
-        target_fps = 12
+        target_fps = task.get("fps") or 12
 
         print(f"[JobQueue] Processing task {task_id} ({task.get('filename', '?')})")
 
