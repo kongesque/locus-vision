@@ -681,7 +681,7 @@
 					<!-- HUD overlay - top right: model -->
 					<div class="pointer-events-none absolute top-3 right-3 z-10">
 						<span class="font-mono text-[10px] text-white/40">
-							{task?.model_name || 'yolo11n'} · {task?.fps || 12}fps
+							{task?.model_name || 'yolo11n'} · {task?.fps}fps
 						</span>
 					</div>
 
@@ -848,7 +848,7 @@
 				<span class="text-border">│</span>
 				<div class="flex shrink-0 items-center gap-1.5">
 					<HardDrive class="size-3 text-amber-400" />
-					<span class="text-[11px] font-semibold">12 FPS · ByteTrack</span>
+					<span class="text-[11px] font-semibold">{task?.fps} FPS · ByteTrack</span>
 				</div>
 				<span class="text-border">│</span>
 				<div class="flex shrink-0 items-center gap-1.5">
