@@ -37,7 +37,7 @@
 	let taskId = $derived(data.taskId);
 	// Create a local state for task so we can update it immediately after rename
 	let task = $state<any>(null);
-	
+
 	// Sync task with data.task when it changes
 	$effect(() => {
 		task = data.task;
@@ -540,7 +540,7 @@
 </script>
 
 <svelte:head>
-	<title>{task ? (task.name || task.filename) : 'Task Result'} · Locus</title>
+	<title>{task ? task.name || task.filename : 'Task Result'} · Locus</title>
 </svelte:head>
 
 <div class="flex h-full flex-col overflow-hidden">
@@ -555,7 +555,7 @@
 			<div class="flex flex-col">
 				<div class="flex items-center gap-2">
 					<h1 class="text-lg font-semibold tracking-tight">
-						{task ? (task.name || task.filename) : `Task ${taskId?.slice(0, 8) ?? '—'}`}
+						{task ? task.name || task.filename : `Task ${taskId?.slice(0, 8) ?? '—'}`}
 					</h1>
 					<!-- Status badge -->
 					<span
@@ -674,14 +674,14 @@
 					<!-- HUD overlay - top left: filename -->
 					<div class="pointer-events-none absolute top-3 left-3 z-10">
 						<span class="font-mono text-[11px] font-medium tracking-wider text-white/50 uppercase">
-							{(task?.name || task?.filename) || 'Video'}
+							{task?.name || task?.filename || 'Video'}
 						</span>
 					</div>
 
 					<!-- HUD overlay - top right: model -->
 					<div class="pointer-events-none absolute top-3 right-3 z-10">
 						<span class="font-mono text-[10px] text-white/40">
-							{task?.model_name || 'yolo11n'} · 12fps
+							{task?.model_name || 'yolo11n'} · {task?.fps || 12}fps
 						</span>
 					</div>
 
@@ -1012,8 +1012,9 @@
 				Delete Task
 			</Dialog.Title>
 			<Dialog.Description>
-				Are you sure you want to delete <strong>{(task?.name || task?.filename) || 'this task'}</strong>? This
-				action cannot be undone.
+				Are you sure you want to delete <strong
+					>{task?.name || task?.filename || 'this task'}</strong
+				>? This action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>
 		<Dialog.Footer class="gap-2 sm:justify-end">
