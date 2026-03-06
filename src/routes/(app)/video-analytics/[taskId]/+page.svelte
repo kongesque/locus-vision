@@ -4,6 +4,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import {
 		ChevronLeft,
 		Loader2,
@@ -25,7 +27,8 @@
 		SkipForward,
 		Settings,
 		Trash2,
-		MoreVertical
+		MoreVertical,
+		Check
 	} from '@lucide/svelte';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -83,6 +86,8 @@
 			} else {
 				status = 'processing';
 			}
+			// Initialize task name for editing
+			taskName = task.name || task.filename || `Task ${taskId?.slice(0, 8)}`;
 		}
 	});
 
@@ -332,6 +337,9 @@
 	let taskProgress = $state(0);
 	let isDeleteDialogOpen = $state(false);
 	let isDeleting = $state(false);
+	let isSettingsOpen = $state(false);
+	let isSaving = $state(false);
+	let taskName = $state('');
 
 	async function deleteTask() {
 		try {
@@ -351,6 +359,35 @@
 		} finally {
 			isDeleting = false;
 			isDeleteDialogOpen = false;
+		}
+	}
+
+	async function saveSettings() {
+		try {
+			isSaving = true;
+			const res = await fetch(`http://localhost:8000/api/video/${taskId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: taskName
+				})
+			});
+			if (res.ok) {
+				const data = await res.json();
+				// Update the local task data with the new name
+				if (task) {
+					task.name = data.name || taskName;
+				}
+				isSettingsOpen = false;
+			} else {
+				const data = await res.json();
+				alert(data.detail || 'Failed to save settings');
+			}
+		} catch (err) {
+			console.error(err);
+			alert('Error saving settings');
+		} finally {
+			isSaving = false;
 		}
 	}
 
@@ -572,6 +609,11 @@
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="end" class="w-48">
 					<DropdownMenu.Label>Task Options</DropdownMenu.Label>
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item onclick={() => (isSettingsOpen = true)}>
+						<Settings class="mr-2 size-4" />
+						Settings
+					</DropdownMenu.Item>
 					<DropdownMenu.Separator />
 					<DropdownMenu.Item
 						class="text-red-600 focus:bg-red-500/10 focus:text-red-600"
@@ -932,6 +974,36 @@
 		</div>
 	</footer>
 </div>
+
+<!-- Settings Dialog -->
+<Dialog.Root bind:open={isSettingsOpen}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Task Settings</Dialog.Title>
+			<Dialog.Description>Update task name.</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="grid gap-4 py-4">
+			<div class="grid gap-2">
+				<Label for="name">Task Name</Label>
+				<Input id="name" bind:value={taskName} placeholder="e.g. My Analysis Task" />
+			</div>
+		</div>
+
+		<Dialog.Footer class="gap-2 sm:justify-end">
+			<Button variant="outline" onclick={() => (isSettingsOpen = false)}>Cancel</Button>
+			<Button onclick={saveSettings} disabled={isSaving}>
+				{#if isSaving}
+					<Loader2 class="mr-2 size-4 animate-spin" />
+					Saving...
+				{:else}
+					<Check class="mr-2 size-4" />
+					Save Changes
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 <!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={isDeleteDialogOpen}>
