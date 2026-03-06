@@ -35,7 +35,13 @@
 	let { data } = $props();
 
 	let taskId = $derived(data.taskId);
-	let task = $derived(data.task as any);
+	// Create a local state for task so we can update it immediately after rename
+	let task = $state<any>(null);
+	
+	// Sync task with data.task when it changes
+	$effect(() => {
+		task = data.task;
+	});
 
 	let videoSrc = $state<string | null>(null);
 	let status = $state<'loading' | 'processing' | 'ready' | 'error'>('loading');
@@ -373,11 +379,9 @@
 				})
 			});
 			if (res.ok) {
-				const data = await res.json();
+				const responseData = await res.json();
 				// Update the local task data with the new name
-				if (task) {
-					task.name = data.name || taskName;
-				}
+				task = { ...task, name: responseData.name || taskName };
 				isSettingsOpen = false;
 			} else {
 				const data = await res.json();
