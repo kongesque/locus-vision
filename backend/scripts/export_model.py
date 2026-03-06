@@ -59,14 +59,10 @@ def main():
     export_kwargs = {"format": "onnx", "imgsz": 640, "simplify": True}
     if half_precision:
         export_kwargs["half"] = True
-    if int8_precision:
-        export_kwargs["int8"] = True
-        export_kwargs["data"] = "coco128.yaml"  # Ultralytics often needs dataset for calibration
         
     export_path = model.export(**export_kwargs)
     
-    # The export typically saves next to the .pt file
-    # Move to our models dir if needed
+    # Define suffixes and paths
     suffix = ""
     if int8_precision:
         suffix = "_int8"
@@ -74,13 +70,37 @@ def main():
         suffix = "_half"
         
     target_path = os.path.join(models_dir, f"{model_name}{suffix}.onnx")
-    if export_path and os.path.exists(export_path) and os.path.abspath(export_path) != os.path.abspath(target_path):
-        shutil.move(export_path, target_path)
-        print(f"Moved exported model to {target_path}")
-    elif os.path.exists(target_path):
-        print(f"Model exported successfully: {target_path}")
+    
+    if int8_precision and export_path and os.path.exists(export_path):
+        import onnx
+        from onnxruntime.quantization import quantize_dynamic, QuantType
+        
+        print(f"Running dynamic ONNX quantization to INT8 for {export_path}...")
+        try:
+            quantize_dynamic(
+                model_input=export_path,
+                model_output=target_path,
+                per_channel=True,
+                reduce_range=True,
+                weight_type=QuantType.QInt8,
+            )
+            print(f"Quantization complete. Saved as {target_path}")
+            # Optionally remove the unquantized model if you only wanted int8
+            # os.remove(export_path)
+            
+        except Exception as e:
+            print(f"Quantization failed: {e}")
+            if os.path.abspath(export_path) != os.path.abspath(target_path):
+                shutil.move(export_path, target_path)
     else:
-        print(f"Export completed. Check {export_path}")
+        # Move to our models dir if needed
+        if export_path and os.path.exists(export_path) and os.path.abspath(export_path) != os.path.abspath(target_path):
+            shutil.move(export_path, target_path)
+            print(f"Moved exported model to {target_path}")
+        elif os.path.exists(target_path):
+            print(f"Model exported successfully: {target_path}")
+        else:
+            print(f"Export completed. Check {export_path}")
 
     # Print file sizes for comparison
     if os.path.exists(pt_path):
