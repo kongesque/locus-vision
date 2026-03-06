@@ -22,7 +22,7 @@
 
 	let filteredHistory = $derived(
 		history.filter((item: any) =>
-			(item.filename || item.id).toLowerCase().includes(searchQuery.toLowerCase())
+			((item.name || item.filename) || item.id).toLowerCase().includes(searchQuery.toLowerCase())
 		)
 	);
 
@@ -97,7 +97,7 @@
 				{#each filteredHistory as item (item.id)}
 					<VideoCard
 						taskId={item.id}
-						name={item.filename}
+						name={item.name || item.filename}
 						duration={item.duration || '--:--'}
 						createdAt={new Date(item.created_at).toLocaleString()}
 						format={item.format || 'mp4'}
@@ -132,7 +132,7 @@
 				Delete Task
 			</Dialog.Title>
 			<Dialog.Description>
-				Are you sure you want to delete <strong>{taskToDelete?.filename || 'this task'}</strong>? This
+				Are you sure you want to delete <strong>{(taskToDelete?.name || taskToDelete?.filename) || 'this task'}</strong>? This
 				action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>

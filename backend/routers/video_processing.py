@@ -5,7 +5,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from typing import List
 from database import get_db
-from models import VideoTask
+from models import VideoTask, VideoTaskUpdate
 from services.job_queue import job_queue
 
 router = APIRouter(
@@ -148,3 +148,38 @@ async def delete_task(task_id: str):
             os.remove(path)
 
     return JSONResponse({"message": "Task deleted"})
+
+
+@router.put("/{task_id}")
+async def update_task(task_id: str, update: VideoTaskUpdate):
+    """Update a task's properties (e.g., rename)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM video_tasks WHERE id = ?", (task_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        # Build update fields
+        update_fields = []
+        params = []
+        if update.name is not None:
+            update_fields.append("name = ?")
+            params.append(update.name)
+
+        if not update_fields:
+            return VideoTask(**dict(row))
+
+        params.append(task_id)
+        await db.execute(
+            f"UPDATE video_tasks SET {', '.join(update_fields)} WHERE id = ?",
+            params
+        )
+        await db.commit()
+
+        # Fetch and return updated task
+        cursor = await db.execute("SELECT * FROM video_tasks WHERE id = ?", (task_id,))
+        row = await cursor.fetchone()
+        return VideoTask(**dict(row))
+    finally:
+        await db.close()

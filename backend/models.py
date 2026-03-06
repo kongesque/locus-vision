@@ -136,6 +136,7 @@ class SessionResponse(BaseModel):
 class VideoTask(BaseModel):
     id: str
     filename: str
+    name: str | None = None
     status: str
     progress: int = 0
     created_at: str
@@ -148,6 +149,10 @@ class VideoTask(BaseModel):
     zones: str | None = None
     classes: str | None = None
     error_message: str | None = None
+
+
+class VideoTaskUpdate(BaseModel):
+    name: str | None = None
 
 
 class CameraCreate(BaseModel):

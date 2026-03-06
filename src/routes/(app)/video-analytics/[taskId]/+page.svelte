@@ -536,7 +536,7 @@
 </script>
 
 <svelte:head>
-	<title>{task ? task.filename : 'Task Result'} · Locus</title>
+	<title>{task ? (task.name || task.filename) : 'Task Result'} · Locus</title>
 </svelte:head>
 
 <div class="flex h-full flex-col overflow-hidden">
@@ -676,7 +676,7 @@
 					<!-- HUD overlay - top left: filename -->
 					<div class="pointer-events-none absolute top-3 left-3 z-10">
 						<span class="font-mono text-[11px] font-medium tracking-wider text-white/50 uppercase">
-							{task?.filename || 'Video'}
+							{(task?.name || task?.filename) || 'Video'}
 						</span>
 					</div>
 
@@ -1014,7 +1014,7 @@
 				Delete Task
 			</Dialog.Title>
 			<Dialog.Description>
-				Are you sure you want to delete <strong>{task?.filename || 'this task'}</strong>? This
+				Are you sure you want to delete <strong>{(task?.name || task?.filename) || 'this task'}</strong>? This
 				action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>
