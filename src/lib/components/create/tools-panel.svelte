@@ -125,6 +125,14 @@
 			return [...currentClasses, className];
 		}
 	}
+
+	// Helper for checking if precision is downloaded for the selected model
+	function isPrecisionDownloaded(p: string) {
+		let checkName = selectedModel;
+		if (p === 'int8') checkName += '_int8';
+		if (p === 'fp16') checkName += '_half';
+		return downloadedModels.includes(checkName);
+	}
 </script>
 
 <Card.Root class="flex flex-1 flex-col gap-4 p-4">
@@ -193,16 +201,45 @@
 			>
 				<ToggleGroup.Item value="int8" aria-label="INT8" class="flex-1 gap-1 text-xs">
 					INT8
-					<span
-						class="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-medium text-green-600 dark:text-green-400"
-						>RPi</span
-					>
+					{#if isPrecisionDownloaded('int8')}
+						<span
+							class="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-medium text-green-600 dark:text-green-400"
+							>ready</span
+						>
+					{:else}
+						<span
+							class="rounded-full border bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+							>missing</span
+						>
+					{/if}
 				</ToggleGroup.Item>
-				<ToggleGroup.Item value="fp16" aria-label="FP16" class="flex-1 text-xs">
+				<ToggleGroup.Item value="fp16" aria-label="FP16" class="flex-1 gap-1 text-xs">
 					FP16
+					{#if isPrecisionDownloaded('fp16')}
+						<span
+							class="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-medium text-green-600 dark:text-green-400"
+							>ready</span
+						>
+					{:else}
+						<span
+							class="rounded-full border bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+							>missing</span
+						>
+					{/if}
 				</ToggleGroup.Item>
-				<ToggleGroup.Item value="fp32" aria-label="FP32" class="flex-1 text-xs">
+				<ToggleGroup.Item value="fp32" aria-label="FP32" class="flex-1 gap-1 text-xs">
 					FP32
+					{#if isPrecisionDownloaded('fp32')}
+						<span
+							class="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-medium text-green-600 dark:text-green-400"
+							>ready</span
+						>
+					{:else}
+						<span
+							class="rounded-full border bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+							>missing</span
+						>
+					{/if}
 				</ToggleGroup.Item>
 			</ToggleGroup.Root>
 		</div>
