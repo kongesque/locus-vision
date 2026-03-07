@@ -10,11 +10,29 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { Sun, Moon, Monitor, Database, LogOut, AlertTriangle } from '@lucide/svelte';
+	import { User, Shield, Palette, Users, Database, LogOut, AlertTriangle } from '@lucide/svelte';
 	import { setMode, resetMode } from 'mode-watcher';
 
 	let { data, form }: { data: any; form: any } = $props();
 	let loading = $state('');
+
+	// Tab navigation
+	let activeTab = $state('profile');
+
+	const userTabs = [
+		{ id: 'profile', label: 'Profile', icon: User },
+		{ id: 'security', label: 'Security', icon: Shield },
+		{ id: 'appearance', label: 'Appearance', icon: Palette }
+	];
+
+	const adminTabs = [
+		{ id: 'profile', label: 'Profile', icon: User },
+		{ id: 'security', label: 'Security', icon: Shield },
+		{ id: 'appearance', label: 'Appearance', icon: Palette },
+		{ id: 'admin', label: 'Admin', icon: Users }
+	];
+
+	let tabs = $derived(data.user?.role === 'admin' ? adminTabs : userTabs);
 
 	// Delete user confirmation
 	let deleteUserId = $state<number | null>(null);
@@ -40,188 +58,266 @@
 <div class="relative flex flex-1 flex-col gap-4 p-4">
 	<PageTitle2 />
 
-	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- ACCOUNT -->
-	<!-- ═══════════════════════════════════════════════════ -->
-	<Card.Root>
-		<Card.Header>
-			<Card.Title class="text-lg">Account</Card.Title>
-			<Card.Description>Manage your profile information</Card.Description>
-		</Card.Header>
-		<Card.Content>
-			<form
-				method="POST"
-				action="?/updateAccount"
-				use:enhance={() => {
-					loading = 'account';
-					return async ({ update }) => {
-						loading = '';
-						await update();
-					};
-				}}
-				class="space-y-4"
+	<!-- Tab Navigation -->
+	<div class="flex gap-1 border-b">
+		{#each tabs as tab}
+			<button
+				class="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors
+					{activeTab === tab.id
+					? 'border-b-2 border-primary text-foreground'
+					: 'text-muted-foreground hover:text-foreground'}"
+				onclick={() => (activeTab = tab.id)}
 			>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="space-y-2">
-						<Label for="name">Name</Label>
-						<Input id="name" name="name" value={data.user?.name ?? ''} placeholder="Your name" />
+				<tab.icon class="size-4" />
+				{tab.label}
+			</button>
+		{/each}
+	</div>
+
+	<!-- PROFILE TAB -->
+	{#if activeTab === 'profile'}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-lg">Profile</Card.Title>
+				<Card.Description>Manage your profile information</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<form
+					method="POST"
+					action="?/updateAccount"
+					use:enhance={() => {
+						loading = 'account';
+						return async ({ update }) => {
+							loading = '';
+							await update();
+						};
+					}}
+					class="space-y-4"
+				>
+					<div class="grid gap-4 sm:grid-cols-2">
+						<div class="space-y-2">
+							<Label for="name">Name</Label>
+							<Input id="name" name="name" value={data.user?.name ?? ''} placeholder="Your name" />
+						</div>
+						<div class="space-y-2">
+							<Label for="email">Email</Label>
+							<Input
+								id="email"
+								name="email"
+								type="email"
+								value={data.user?.email ?? ''}
+								placeholder="you@example.com"
+							/>
+						</div>
 					</div>
+
+					{#if form?.accountError}
+						<p class="text-sm text-destructive">{form.accountError}</p>
+					{/if}
+					{#if form?.accountSuccess}
+						<p class="text-sm text-green-600">Account updated successfully</p>
+					{/if}
+
+					<div class="flex justify-end pt-4">
+						<Button type="submit" disabled={loading === 'account'}>
+							{loading === 'account' ? 'Saving…' : 'Save Changes'}
+						</Button>
+					</div>
+				</form>
+
+				<div class="mt-6 flex flex-col gap-4 border-t pt-4">
+					<div class="flex items-center justify-between">
+						<div class="space-y-0.5">
+							<Label class="text-sm font-medium">Sign Out</Label>
+							<p class="text-xs text-muted-foreground">Log out of your account on this device.</p>
+						</div>
+						<form method="POST" action="/logout">
+							<Button type="submit" variant="outline" size="sm">Log Out</Button>
+						</form>
+					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	<!-- SECURITY TAB -->
+	{#if activeTab === 'security'}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-lg">Change Password</Card.Title>
+				<Card.Description>Update your password to keep your account secure</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<form
+					method="POST"
+					action="?/changePassword"
+					use:enhance={() => {
+						loading = 'password';
+						return async ({ update }) => {
+							loading = '';
+							await update();
+						};
+					}}
+					class="space-y-4"
+				>
 					<div class="space-y-2">
-						<Label for="email">Email</Label>
+						<Label for="current_password">Current Password</Label>
 						<Input
-							id="email"
-							name="email"
-							type="email"
-							value={data.user?.email ?? ''}
-							placeholder="you@example.com"
+							id="current_password"
+							name="current_password"
+							type="password"
+							placeholder="Enter current password"
+							autocomplete="current-password"
 						/>
 					</div>
-				</div>
+					<div class="grid gap-4 sm:grid-cols-2">
+						<div class="space-y-2">
+							<Label for="new_password">New Password</Label>
+							<Input
+								id="new_password"
+								name="new_password"
+								type="password"
+								placeholder="Minimum 8 characters"
+								autocomplete="new-password"
+							/>
+						</div>
+						<div class="space-y-2">
+							<Label for="confirm_password">Confirm New Password</Label>
+							<Input
+								id="confirm_password"
+								name="confirm_password"
+								type="password"
+								placeholder="Repeat new password"
+								autocomplete="new-password"
+							/>
+						</div>
+					</div>
 
-				{#if form?.accountError}
-					<p class="text-sm text-destructive">{form.accountError}</p>
-				{/if}
-				{#if form?.accountSuccess}
-					<p class="text-sm text-green-600">Account updated successfully</p>
-				{/if}
+					{#if form?.passwordError}
+						<p class="text-sm text-destructive">{form.passwordError}</p>
+					{/if}
 
-				<div class="flex justify-end pt-4">
-					<Button type="submit" disabled={loading === 'account'}>
-						{loading === 'account' ? 'Saving…' : 'Save Changes'}
-					</Button>
-				</div>
-			</form>
+					<div class="flex justify-end">
+						<Button type="submit" disabled={loading === 'password'}>
+							{loading === 'password' ? 'Changing…' : 'Change Password'}
+						</Button>
+					</div>
+				</form>
+			</Card.Content>
+		</Card.Root>
 
-			<div class="mt-6 flex flex-col gap-4 border-t pt-4">
-				<div class="flex items-center justify-between">
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-lg">Sessions</Card.Title>
+				<Card.Description>Manage your active sessions across devices</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div class="space-y-0.5">
-						<Label class="text-sm font-medium">Sign Out</Label>
-						<p class="text-xs text-muted-foreground">Log out of your account on this device.</p>
+						<div class="flex items-center gap-2">
+							<LogOut class="size-4 text-muted-foreground" />
+							<Label class="text-sm font-medium">Sign Out of All Devices</Label>
+						</div>
+						<p class="text-xs text-muted-foreground">
+							Revoke all active sessions. You will need to log in again on every device.
+						</p>
 					</div>
-					<form method="POST" action="/logout">
-						<Button type="submit" variant="outline" size="sm">Log Out</Button>
-					</form>
-				</div>
-			</div>
-		</Card.Content>
-	</Card.Root>
-
-	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- APPEARANCE -->
-	<!-- ═══════════════════════════════════════════════════ -->
-	<Card.Root>
-		<Card.Header>
-			<Card.Title class="text-lg">Appearance</Card.Title>
-			<Card.Description>Customize the theme of the application</Card.Description>
-		</Card.Header>
-		<Card.Content>
-			<div class="flex items-center gap-4">
-				<Button variant="outline" class="flex items-center gap-2" onclick={() => setMode('light')}>
-					<Sun class="size-4" /> Light
-				</Button>
-				<Button variant="outline" class="flex items-center gap-2" onclick={() => setMode('dark')}>
-					<Moon class="size-4" /> Dark
-				</Button>
-				<Button variant="outline" class="flex items-center gap-2" onclick={() => resetMode()}>
-					<Monitor class="size-4" /> System
-				</Button>
-			</div>
-		</Card.Content>
-	</Card.Root>
-
-	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- SECURITY -->
-	<!-- ═══════════════════════════════════════════════════ -->
-	<Card.Root>
-		<Card.Header>
-			<Card.Title class="text-lg">Security</Card.Title>
-			<Card.Description>Manage your password and active sessions</Card.Description>
-		</Card.Header>
-		<Card.Content>
-			<form
-				method="POST"
-				action="?/changePassword"
-				use:enhance={() => {
-					loading = 'password';
-					return async ({ update }) => {
-						loading = '';
-						await update();
-					};
-				}}
-				class="space-y-4"
-			>
-				<div class="space-y-2">
-					<Label for="current_password">Current Password</Label>
-					<Input
-						id="current_password"
-						name="current_password"
-						type="password"
-						placeholder="Enter current password"
-						autocomplete="current-password"
-					/>
-				</div>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="space-y-2">
-						<Label for="new_password">New Password</Label>
-						<Input
-							id="new_password"
-							name="new_password"
-							type="password"
-							placeholder="Minimum 8 characters"
-							autocomplete="new-password"
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label for="confirm_password">Confirm New Password</Label>
-						<Input
-							id="confirm_password"
-							name="confirm_password"
-							type="password"
-							placeholder="Repeat new password"
-							autocomplete="new-password"
-						/>
-					</div>
-				</div>
-
-				{#if form?.passwordError}
-					<p class="text-sm text-destructive">{form.passwordError}</p>
-				{/if}
-
-				<div class="flex justify-end">
-					<Button type="submit" variant="destructive" disabled={loading === 'password'}>
-						{loading === 'password' ? 'Changing…' : 'Change Password'}
+					<Button variant="outline" size="sm" onclick={() => (signOutAllDialog = true)}>
+						Sign Out Everywhere
 					</Button>
 				</div>
-			</form>
+			</Card.Content>
+		</Card.Root>
 
-			<div
-				class="mt-6 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"
-			>
-				<div class="space-y-0.5">
-					<div class="flex items-center gap-2">
-						<LogOut class="size-4 text-muted-foreground" />
-						<Label class="text-sm font-medium">Sign Out of All Devices</Label>
-					</div>
-					<p class="text-xs text-muted-foreground">
-						Revoke all active sessions. You will need to log in again on every device.
-					</p>
+		<Card.Root class="border-destructive/50 bg-destructive/5">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<AlertTriangle class="size-5 text-destructive" />
+					<Card.Title class="text-lg text-destructive">Danger Zone</Card.Title>
 				</div>
-				<Button variant="outline" size="sm" onclick={() => (signOutAllDialog = true)}>
-					Sign Out Everywhere
-				</Button>
-			</div>
-		</Card.Content>
-	</Card.Root>
+				<Card.Description class="text-destructive/80">
+					Destructive actions that cannot be undone. Proceed with caution.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				<div
+					class="flex items-center justify-between rounded-lg border border-destructive/20 bg-background p-4"
+				>
+					<div class="space-y-0.5">
+						<p class="font-medium">Delete Account</p>
+						<p class="text-sm text-muted-foreground">
+							Permanently delete your account and all associated data.
+						</p>
+					</div>
+					<Button variant="destructive" size="sm" onclick={() => (deleteAccountDialog = true)}>
+						Delete Account
+					</Button>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
-	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- ADMIN SECTION -->
-	<!-- ═══════════════════════════════════════════════════ -->
-	{#if data.user?.role === 'admin'}
-		<Separator class="my-2" />
+	<!-- APPEARANCE TAB -->
+	{#if activeTab === 'appearance'}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-lg">Theme</Card.Title>
+				<Card.Description>Customize the appearance of the application</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="flex flex-wrap items-center gap-3">
+					<Button
+						variant="outline"
+						class="flex items-center gap-2"
+						onclick={() => setMode('light')}
+					>
+						<svg
+							class="size-4"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<circle cx="12" cy="12" r="4" />
+							<path
+								d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+							/>
+						</svg>
+						Light
+					</Button>
+					<Button variant="outline" class="flex items-center gap-2" onclick={() => setMode('dark')}>
+						<svg
+							class="size-4"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+						</svg>
+						Dark
+					</Button>
+					<Button variant="outline" class="flex items-center gap-2" onclick={() => resetMode()}>
+						<svg
+							class="size-4"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<rect width="20" height="14" x="2" y="3" rx="2" />
+							<line x1="8" x2="16" y1="21" y2="21" />
+							<line x1="12" x2="12" y1="17" y2="21" />
+						</svg>
+						System
+					</Button>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
-		<span class="text-lg font-semibold tracking-tight text-muted-foreground">Administration</span>
-
-		<!-- APP SETTINGS -->
+	<!-- ADMIN TAB -->
+	{#if activeTab === 'admin' && data.user?.role === 'admin'}
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-lg">App Settings</Card.Title>
@@ -275,7 +371,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- DATA MANAGEMENT -->
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-lg text-destructive">Data Management</Card.Title>
@@ -326,7 +421,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- USER MANAGEMENT -->
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-lg">User Management</Card.Title>
@@ -432,34 +526,6 @@
 						{/each}
 					</Table.Body>
 				</Table.Root>
-			</Card.Content>
-		</Card.Root>
-
-		<!-- DANGER ZONE -->
-		<Card.Root class="border-destructive/50 bg-destructive/5">
-			<Card.Header>
-				<div class="flex items-center gap-2">
-					<AlertTriangle class="size-5 text-destructive" />
-					<Card.Title class="text-lg text-destructive">Danger Zone</Card.Title>
-				</div>
-				<Card.Description class="text-destructive/80">
-					Destructive actions that cannot be undone. Proceed with caution.
-				</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				<div
-					class="flex items-center justify-between rounded-lg border border-destructive/20 bg-background p-4"
-				>
-					<div class="space-y-0.5">
-						<p class="font-medium">Delete Account</p>
-						<p class="text-sm text-muted-foreground">
-							Permanently delete your account and all associated data.
-						</p>
-					</div>
-					<Button variant="destructive" size="sm" onclick={() => (deleteAccountDialog = true)}>
-						Delete Account
-					</Button>
-				</div>
 			</Card.Content>
 		</Card.Root>
 	{/if}
