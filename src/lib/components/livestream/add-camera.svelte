@@ -260,12 +260,14 @@
 				<div class="space-y-2">
 					<Label for="device">Device</Label>
 					<Select.Root type="single" bind:value={selectedDeviceId} disabled={isConnecting}>
-						<Select.Trigger id="device" placeholder="Select a device" />
+						<Select.Trigger id="device" class="w-full">
+							{devices.find((d) => d.deviceId === selectedDeviceId)?.label || 'Select a device'}
+						</Select.Trigger>
 						<Select.Content>
 							{#each devices as device (device.deviceId)}
-								<Select.Item value={device.deviceId}
-									>{device.label || `Camera ${devices.indexOf(device) + 1}`}</Select.Item
-								>
+								<Select.Item value={device.deviceId}>
+									{device.label || `Camera ${devices.indexOf(device) + 1}`}
+								</Select.Item>
 							{/each}
 						</Select.Content>
 					</Select.Root>
