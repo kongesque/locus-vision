@@ -5,7 +5,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Plus } from '@lucide/svelte';
+	import { Plus, Loader2 } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { videoStore } from '$lib/stores/video.svelte';
 
@@ -305,8 +305,19 @@
 				}}
 				disabled={isConnecting}>Cancel</Button
 			>
-			<Button class="cursor-pointer" onclick={handleConnect} disabled={isConnecting}>
-				{isConnecting ? 'Connecting...' : 'Connect'}
+			<Button
+				class="cursor-pointer"
+				onclick={handleConnect}
+				disabled={isConnecting ||
+					(activeTab === 'rtsp' && (!rtspName.trim() || !rtspUrl.trim())) ||
+					(activeTab === 'webcam' && !webcamName.trim())}
+			>
+				{#if isConnecting}
+					<Loader2 class="mr-2 size-4 animate-spin" />
+					Connecting...
+				{:else}
+					Connect
+				{/if}
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
