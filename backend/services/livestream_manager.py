@@ -15,6 +15,7 @@ from datetime import datetime
 from services.analytics_engine import AnalyticsEngine
 from services.metrics_collector import metrics_collector
 from services.duckdb_client import client as db_client
+from services.video_capture import create_video_capture, get_capture_info
 
 
 class LivestreamManager:
@@ -22,7 +23,7 @@ class LivestreamManager:
         self.active_streams = {}  # camera_id -> StreamContext
         self.lock = threading.Lock()
 
-    def get_or_create_stream(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24):
+    def get_or_create_stream(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24, source=None, enable_hw_accel=True):
         with self.lock:
             if camera_id not in self.active_streams:
                 self.active_streams[camera_id] = StreamContext(
@@ -31,13 +32,17 @@ class LivestreamManager:
                     classes=classes,
                     model_name=model_name,
                     fps=fps,
+                    source=source,
+                    enable_hw_accel=enable_hw_accel,
                 )
                 self.active_streams[camera_id].start()
             return self.active_streams[camera_id]
 
 class StreamContext:
-    def __init__(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24):
+    def __init__(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24, source=None, enable_hw_accel=True):
         self.camera_id = camera_id
+        self.source = source if source is not None else 0  # Default to webcam 0
+        self.enable_hw_accel = enable_hw_accel
         self.target_fps = fps
         self.video_clients = []
         self.event_clients = []
@@ -99,12 +104,18 @@ class StreamContext:
             self.track_events_buffer.clear()
 
     def _capture_loop(self):
-        cap = cv2.VideoCapture(0)
+        # Use hardware-accelerated video capture
+        cap = create_video_capture(self.source, enable_hw_accel=self.enable_hw_accel)
         
         if not cap.isOpened() or not cap.read()[0]:
-            print(f"[Livestream] Cannot open webcam 0. Falling back to dummy feed.")
+            print(f"[Livestream] Cannot open source {self.source}. Falling back to dummy feed.")
+            cap.release()
             self._dummy_loop()
             return
+        
+        # Log capture info for debugging
+        info = get_capture_info(cap)
+        print(f"[Livestream] Camera {self.camera_id} info: {info}")
 
         target_fps = self.target_fps
         frame_interval = 1.0 / target_fps
