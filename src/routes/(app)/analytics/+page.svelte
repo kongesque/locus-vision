@@ -167,6 +167,18 @@
 		const url = `http://127.0.0.1:8000/api/analytics/export?camera_id=${selectedCamera}&start_time=${start.toISOString()}&end_time=${end.toISOString()}&format=csv`;
 		window.open(url, '_blank');
 	}
+
+	function handleDownloadJson() {
+		if (!selectedCamera) return;
+		const end = new Date();
+		const start = new Date();
+		if (timeRange === '24h') start.setHours(start.getHours() - 24);
+		else if (timeRange === '7d') start.setDate(start.getDate() - 7);
+		else if (timeRange === '30d') start.setDate(start.getDate() - 30);
+
+		const url = `http://127.0.0.1:8000/api/analytics/export?camera_id=${selectedCamera}&start_time=${start.toISOString()}&end_time=${end.toISOString()}&format=json`;
+		window.open(url, '_blank');
+	}
 </script>
 
 <svelte:head>
@@ -210,6 +222,12 @@
 				onclick={handleDownloadCsv}
 			>
 				<Download class="mr-2 h-4 w-4" /> Export CSV
+			</button>
+			<button
+				class="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium whitespace-nowrap shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+				onclick={handleDownloadJson}
+			>
+				<Download class="mr-2 h-4 w-4" /> Export JSON
 			</button>
 		</div>
 	</div>
