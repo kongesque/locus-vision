@@ -99,7 +99,7 @@
 
 	onMount(() => {
 		fetchStats();
-		refreshInterval = setInterval(fetchStats, 2000);
+		refreshInterval = setInterval(fetchStats, 3000);
 	});
 
 	onDestroy(() => {

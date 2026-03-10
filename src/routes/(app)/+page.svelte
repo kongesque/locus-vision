@@ -95,7 +95,7 @@
 	async function fetchAll() {
 		try {
 			const [sysRes, histRes, queueRes] = await Promise.allSettled([
-				fetch('http://127.0.0.1:8000/api/system/stats'),
+				fetch('http://localhost:8000/api/system/stats'),
 				fetch('http://127.0.0.1:8000/api/video/history'),
 				fetch('http://127.0.0.1:8000/api/video/queue/status')
 			]);
@@ -237,7 +237,7 @@
 					</Card.Header>
 					<Card.Content>
 						<div class="text-3xl font-bold tracking-tight tabular-nums">
-							{stats.system.cpu_percent.toFixed(0)}<span class="text-lg text-muted-foreground"
+							{stats.system.cpu_percent.toFixed(1)}<span class="text-lg text-muted-foreground"
 								>%</span
 							>
 						</div>
@@ -267,7 +267,7 @@
 					</Card.Header>
 					<Card.Content>
 						<div class="text-3xl font-bold tracking-tight tabular-nums">
-							{stats.system.memory_percent.toFixed(0)}<span class="text-lg text-muted-foreground"
+							{stats.system.memory_percent.toFixed(1)}<span class="text-lg text-muted-foreground"
 								>%</span
 							>
 						</div>
