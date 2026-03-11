@@ -6,12 +6,19 @@ from fastapi.responses import JSONResponse
 from typing import List
 from database import get_db
 from models import CameraCreate, CameraUpdate, CameraResponse
+from services.discovery_service import discovery_service
 
 router = APIRouter(
     prefix="/api/cameras",
     tags=["cameras"],
     responses={404: {"description": "Not found"}},
 )
+
+
+@router.get("/discover")
+async def discover_cameras():
+    """Discover local and network cameras."""
+    return await discovery_service.discover_all()
 
 
 @router.get("", response_model=List[CameraResponse])

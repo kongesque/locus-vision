@@ -2,10 +2,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Plus, Loader2 } from '@lucide/svelte';
+	import { Plus, Loader2, RefreshCw, Camera, Globe } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { videoStore } from '$lib/stores/video.svelte';
 
@@ -21,25 +20,48 @@
 			addCameraDialogOpen.set(false);
 		}
 	});
-	let activeTab = $state('rtsp');
+
+	let activeTab = $state('discovery');
 	let isConnecting = $state(false);
 
-	// RTSP form fields
-	let rtspName = $state('');
-	let rtspUrl = $state('');
+	// Discovery state
+	let isDiscovering = $state(false);
+	interface DiscoveredCamera {
+		name: string;
+		type: 'v4l2' | 'onvif';
+		url: string;
+		id: string;
+	}
+	let discoveredCameras = $state<DiscoveredCamera[]>([]);
+	let selectedDiscoveryId = $state<string | null>(null);
+
+	async function runDiscovery() {
+		try {
+			isDiscovering = true;
+			const response = await fetch('http://localhost:8000/api/cameras/discover');
+			if (!response.ok) throw new Error('Discovery failed');
+			discoveredCameras = await response.json();
+		} catch (err) {
+			console.error('Discovery error:', err);
+		} finally {
+			isDiscovering = false;
+		}
+	}
+
+	// Manual RTSP/HTTP form fields
+	let manualName = $state('');
+	let manualUrl = $state('');
 	let rtspPreview = $state<string | null>(null);
 	let rtspPreviewError = $state<string | null>(null);
 	let isTesting = $state(false);
 
-	async function testRtspConnection() {
-		if (!rtspUrl.trim()) return;
+	async function testConnection() {
+		if (!manualUrl.trim()) return;
 		try {
 			isTesting = true;
 			rtspPreviewError = null;
 			rtspPreview = null;
-
-			// TODO: Backend preview endpoint not yet implemented
-			// For now, simulate a successful test
+			// Simulation for now
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			rtspPreview = '/locus.png';
 		} catch (err) {
@@ -49,109 +71,41 @@
 		}
 	}
 
-	// Webcam form fields
-	let webcamName = $state('');
-	let selectedDeviceId = $state<string | undefined>(undefined);
-
-	let devices = $state<MediaDeviceInfo[]>([]);
-	let localStream = $state<MediaStream | null>(null);
-	let permissionError = $state<string | null>(null);
-	let connectionSuccess = $state(false);
-
-	async function startWebcam(deviceId?: string) {
-		try {
-			permissionError = null;
-			if (localStream) {
-				localStream.getTracks().forEach((t) => t.stop());
-			}
-
-			const constraints: MediaStreamConstraints = {
-				video:
-					deviceId && deviceId !== 'default'
-						? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-						: { width: { ideal: 1920 }, height: { ideal: 1080 } }
-			};
-
-			const stream = await navigator.mediaDevices.getUserMedia(constraints);
-			localStream = stream;
-
-			// Get list of all video devices
-			const allDevices = await navigator.mediaDevices.enumerateDevices();
-			devices = allDevices.filter((d) => d.kind === 'videoinput');
-
-			// Sync selected device with what the browser actually chose
-			if (!deviceId && devices.length > 0 && stream.getVideoTracks().length > 0) {
-				selectedDeviceId = stream.getVideoTracks()[0].getSettings().deviceId;
-			}
-		} catch (err) {
-			console.error('Webcam error:', err);
-			permissionError = 'Could not access camera. Please check permissions.';
-		}
-	}
-
-	function stopWebcam() {
-		if (localStream) {
-			localStream.getTracks().forEach((t) => t.stop());
-			localStream = null;
-		}
-	}
-
-	// Watch for dialog open/close and tab changes
+	// Watch for dialog open to trigger discovery
 	$effect(() => {
-		const isOpen = open;
-		const tab = activeTab;
-
-		untrack(() => {
-			if (isOpen && tab === 'webcam') {
-				if (!localStream) {
-					startWebcam(selectedDeviceId);
-				}
-			} else if (!connectionSuccess) {
-				stopWebcam();
-			}
-		});
-	});
-
-	// Watch for manual device changes from the dropdown
-	$effect(() => {
-		const deviceId = selectedDeviceId;
-		untrack(() => {
-			if (open && activeTab === 'webcam' && localStream) {
-				const currentDeviceId = localStream.getVideoTracks()[0]?.getSettings().deviceId;
-				if (deviceId && deviceId !== 'default' && deviceId !== currentDeviceId) {
-					startWebcam(deviceId);
-				}
-			}
-		});
-	});
-
-	// Svelte action to pipe the MediaStream into the video element
-	function videoAction(node: HTMLVideoElement, stream: MediaStream | null) {
-		if (stream) {
-			node.srcObject = stream;
+		if (open && activeTab === 'discovery') {
+			untrack(() => {
+				runDiscovery();
+			});
 		}
-		return {
-			update(newStream: MediaStream | null) {
-				if (node.srcObject !== newStream) {
-					node.srcObject = newStream;
-				}
-			}
-		};
-	}
+	});
 
 	async function handleConnect() {
 		try {
 			isConnecting = true;
 			const cameraId = crypto.randomUUID();
-			const config = {
-				id: cameraId,
-				name: activeTab === 'webcam' ? webcamName || 'Webcam' : rtspName || 'RTSP Stream',
-				type: activeTab,
-				url: activeTab === 'rtsp' ? rtspUrl : null,
-				device_id: activeTab === 'webcam' ? selectedDeviceId || null : null
-			};
+			
+			let config: any;
+			if (activeTab === 'discovery' && selectedDiscoveryId) {
+				const cam = discoveredCameras.find(c => c.id === selectedDiscoveryId);
+				if (!cam) return;
+				config = {
+					id: cameraId,
+					name: cam.name,
+					type: cam.type === 'v4l2' ? 'stream' : 'rtsp',
+					url: cam.type === 'onvif' ? cam.url : null,
+					device_id: cam.type === 'v4l2' ? cam.url : null
+				};
+			} else {
+				config = {
+					id: cameraId,
+					name: manualName || 'Manual Stream',
+					type: 'rtsp',
+					url: manualUrl,
+					device_id: null
+				};
+			}
 
-			// POST to backend to persist the camera
 			const response = await fetch('http://localhost:8000/api/cameras', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -163,21 +117,18 @@
 				throw new Error(errData.detail || 'Failed to create camera');
 			}
 
-			// Set video store for the create page preview
-			videoStore.setVideoType(activeTab as 'rtsp' | 'stream');
-			if (activeTab === 'rtsp') {
-				videoStore.setVideoUrl(rtspUrl);
+			videoStore.setVideoType(config.type === 'rtsp' ? 'rtsp' : 'stream');
+			if (config.type === 'rtsp') {
+				videoStore.setVideoUrl(config.url);
 			} else {
-				videoStore.setVideoType('stream');
-				videoStore.setVideoStream(localStream);
-				connectionSuccess = true;
+				videoStore.setVideoStream(null); // Backend will handle the stream
 			}
 
 			open = false;
 			goto(`/create/${cameraId}`);
 		} catch (err) {
 			console.error(err);
-			alert('Failed to connect camera: ' + (err instanceof Error ? err.message : String(err)));
+			alert('Failed to connect: ' + (err instanceof Error ? err.message : String(err)));
 		} finally {
 			isConnecting = false;
 		}
@@ -197,41 +148,85 @@
 	<Dialog.Content class="sm:max-w-[500px]">
 		<Dialog.Header>
 			<Dialog.Title>Add Camera</Dialog.Title>
-			<Dialog.Description>Connect a new camera via RTSP stream or local webcam.</Dialog.Description>
+			<Dialog.Description>Connect via automatic discovery or manual configuration.</Dialog.Description>
 		</Dialog.Header>
 
 		<Tabs.Root bind:value={activeTab} class="w-full">
 			<Tabs.List class="grid w-full grid-cols-2">
-				<Tabs.Trigger value="rtsp" class="cursor-pointer">RTSP / HTTP</Tabs.Trigger>
-				<Tabs.Trigger value="webcam" class="cursor-pointer">Webcam</Tabs.Trigger>
+				<Tabs.Trigger value="discovery" class="cursor-pointer">Discovered</Tabs.Trigger>
+				<Tabs.Trigger value="manual" class="cursor-pointer">Manual Entry</Tabs.Trigger>
 			</Tabs.List>
 
-			<Tabs.Content value="rtsp" class="space-y-4 py-4">
+			<Tabs.Content value="discovery" class="space-y-4 py-4">
+				<div class="flex items-center justify-between">
+					<Label>Available Devices</Label>
+					<Button variant="ghost" size="sm" onclick={runDiscovery} disabled={isDiscovering} class="h-8 cursor-pointer">
+						<RefreshCw class="mr-2 size-3 {isDiscovering ? 'animate-spin' : ''}" />
+						Refresh
+					</Button>
+				</div>
+
+				<div class="max-h-[300px] space-y-2 overflow-y-auto rounded-md border p-2">
+					{#if isDiscovering && discoveredCameras.length === 0}
+						<div class="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
+							<Loader2 class="mb-2 size-6 animate-spin" />
+							Scanning local network and hardware...
+						</div>
+					{:else if discoveredCameras.length === 0}
+						<div class="py-8 text-center text-sm text-muted-foreground">
+							No cameras found. Try manual entry or refresh.
+						</div>
+					{:else}
+						{#each discoveredCameras as cam (cam.id)}
+							<button
+								class="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent {selectedDiscoveryId === cam.id ? 'border-primary bg-primary/5' : ''}"
+								onclick={() => selectedDiscoveryId = cam.id}
+							>
+								<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+									{#if cam.type === 'v4l2'}
+										<Camera class="size-5 text-muted-foreground" />
+									{:else}
+										<Globe class="size-5 text-muted-foreground" />
+									{/if}
+								</div>
+								<div class="flex-1 overflow-hidden">
+									<div class="truncated font-medium">{cam.name}</div>
+									<div class="truncate text-xs text-muted-foreground">
+										{cam.type.toUpperCase()} • {cam.url}
+									</div>
+								</div>
+							</button>
+						{/each}
+					{/if}
+				</div>
+			</Tabs.Content>
+
+			<Tabs.Content value="manual" class="space-y-4 py-4">
 				<div class="space-y-2">
-					<Label for="rtsp-name">Camera Name</Label>
+					<Label for="manual-name">Camera Name</Label>
 					<Input
-						id="rtsp-name"
+						id="manual-name"
 						placeholder="e.g. Front Door"
-						bind:value={rtspName}
+						bind:value={manualName}
 						disabled={isConnecting}
 					/>
 				</div>
 
 				<div class="space-y-2">
-					<Label for="rtsp-url">Stream URL</Label>
+					<Label for="manual-url">Stream URL</Label>
 					<div class="flex gap-2">
 						<Input
-							id="rtsp-url"
+							id="manual-url"
 							placeholder="rtsp://admin:password@192.168.1.10:554/stream"
-							bind:value={rtspUrl}
+							bind:value={manualUrl}
 							disabled={isConnecting || isTesting}
 							class="flex-1"
 						/>
 						<Button
 							variant="outline"
 							class="shrink-0 cursor-pointer"
-							onclick={testRtspConnection}
-							disabled={!rtspUrl.trim() || isTesting || isConnecting}
+							onclick={testConnection}
+							disabled={!manualUrl.trim() || isTesting || isConnecting}
 						>
 							{isTesting ? 'Testing...' : 'Test'}
 						</Button>
@@ -244,60 +239,12 @@
 					{#if rtspPreviewError}
 						<div class="px-4 text-center text-sm text-red-500">{rtspPreviewError}</div>
 					{:else if rtspPreview}
-						<img src={rtspPreview} alt="RTSP Preview" class="h-full w-full object-cover" />
+						<img src={rtspPreview} alt="Preview" class="h-full w-full object-cover" />
 					{:else if isTesting}
-						<div class="animate-pulse text-sm text-muted-foreground">Connecting to stream...</div>
+						<div class="animate-pulse text-sm text-muted-foreground">Connecting...</div>
 					{:else}
 						<div class="text-sm text-muted-foreground">
 							Enter a stream URL and click Test to preview
-						</div>
-					{/if}
-				</div>
-			</Tabs.Content>
-
-			<Tabs.Content value="webcam" class="space-y-4 py-4">
-				<div class="space-y-2">
-					<Label for="webcam-name">Camera Name</Label>
-					<Input
-						id="webcam-name"
-						placeholder="e.g. Desk Webcam"
-						bind:value={webcamName}
-						disabled={isConnecting}
-					/>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="device">Device</Label>
-					<Select.Root type="single" bind:value={selectedDeviceId} disabled={isConnecting}>
-						<Select.Trigger id="device" class="w-full">
-							{devices.find((d) => d.deviceId === selectedDeviceId)?.label || 'Select a device'}
-						</Select.Trigger>
-						<Select.Content>
-							{#each devices as device (device.deviceId)}
-								<Select.Item value={device.deviceId}>
-									{device.label || `Camera ${devices.indexOf(device) + 1}`}
-								</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
-				</div>
-
-				<div
-					class="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-black"
-				>
-					{#if permissionError}
-						<div class="px-4 text-center text-sm text-red-500">{permissionError}</div>
-					{:else if localStream}
-						<video
-							use:videoAction={localStream}
-							autoplay
-							playsinline
-							muted
-							class="h-full w-full object-cover"
-						></video>
-					{:else}
-						<div class="animate-pulse text-sm text-muted-foreground">
-							Requesting camera access...
 						</div>
 					{/if}
 				</div>
@@ -308,18 +255,15 @@
 			<Button
 				variant="outline"
 				class="cursor-pointer"
-				onclick={() => {
-					open = false;
-					stopWebcam();
-				}}
+				onclick={() => open = false}
 				disabled={isConnecting}>Cancel</Button
 			>
 			<Button
 				class="cursor-pointer"
 				onclick={handleConnect}
 				disabled={isConnecting ||
-					(activeTab === 'rtsp' && (!rtspName.trim() || !rtspUrl.trim())) ||
-					(activeTab === 'webcam' && !webcamName.trim())}
+					(activeTab === 'manual' && (!manualName.trim() || !manualUrl.trim())) ||
+					(activeTab === 'discovery' && !selectedDiscoveryId)}
 			>
 				{#if isConnecting}
 					<Loader2 class="mr-2 size-4 animate-spin" />
