@@ -21,6 +21,31 @@ async def discover_cameras():
     return await discovery_service.discover_all()
 
 
+@router.get("/snapshot")
+async def camera_snapshot(source: str):
+    """Capture a single JPEG frame from a camera source for preview."""
+    import cv2
+    from fastapi.responses import Response
+
+    try:
+        # Try as integer index first (local camera)
+        src = int(source) if source.isdigit() else source
+        cap = cv2.VideoCapture(src)
+        if not cap.isOpened():
+            raise HTTPException(status_code=404, detail="Could not open camera")
+
+        ret, frame = cap.read()
+        cap.release()
+
+        if not ret:
+            raise HTTPException(status_code=500, detail="Failed to capture frame")
+
+        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        return Response(content=buffer.tobytes(), media_type="image/jpeg")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid source")
+
+
 @router.get("", response_model=List[CameraResponse])
 async def list_cameras():
     """List all cameras."""

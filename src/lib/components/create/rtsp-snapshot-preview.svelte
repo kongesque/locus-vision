@@ -76,7 +76,13 @@
 	}
 
 	function initStream() {
-		if (!videoRef || !url) return;
+		if (!url) return;
+
+		// Non-HLS (RTSP / local device): rendered as MJPEG <img> in template.
+		// isLoading is cleared by the img's onload handler.
+		if (!isHlsUrl(url)) return;
+
+		if (!videoRef) return;
 
 		// Clean up previous instance
 		if (hlsInstance) {
@@ -188,18 +194,14 @@
 				onloadedmetadata={updateDims}
 				onresize={updateDims}
 			></video>
-			<!-- TODO: MJPEG Proxy Route disconnected
-			The backend proxy was removed at `/api/cameras/stream/${cameraId}`.
-			
-			Previous code:
-			src={`http://localhost:8000/api/cameras/stream/${cameraId}`}
-			-->
+		{:else}
+			<!-- MJPEG stream for RTSP / local cameras -->
 			<img
 				bind:this={videoRef as any}
-				src=""
-				alt="Camera view (Disconnected)"
+				src={`http://localhost:8000/api/livestream/${cameraId}/video`}
+				alt="Camera stream"
 				class="pointer-events-none max-h-full max-w-full object-contain"
-				onload={updateDims}
+				onload={() => { isLoading = false; updateDims(); }}
 				onresize={updateDims}
 				crossorigin="anonymous"
 			/>

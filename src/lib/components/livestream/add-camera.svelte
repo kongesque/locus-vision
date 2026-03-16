@@ -34,6 +34,8 @@
 	}
 	let discoveredCameras = $state<DiscoveredCamera[]>([]);
 	let selectedDiscoveryId = $state<string | null>(null);
+	let previewUrl = $state<string | null>(null);
+	let isLoadingPreview = $state(false);
 
 	async function runDiscovery() {
 		try {
@@ -45,6 +47,29 @@
 			console.error('Discovery error:', err);
 		} finally {
 			isDiscovering = false;
+		}
+	}
+
+	async function selectCamera(camId: string) {
+		selectedDiscoveryId = camId;
+		const cam = discoveredCameras.find((c) => c.id === camId);
+		if (!cam) return;
+
+		// Load a preview snapshot from the backend
+		try {
+			isLoadingPreview = true;
+			previewUrl = null;
+			const res = await fetch(
+				`http://localhost:8000/api/cameras/snapshot?source=${encodeURIComponent(cam.url)}`
+			);
+			if (res.ok) {
+				const blob = await res.blob();
+				previewUrl = URL.createObjectURL(blob);
+			}
+		} catch (err) {
+			console.error('Preview error:', err);
+		} finally {
+			isLoadingPreview = false;
 		}
 	}
 
@@ -80,21 +105,42 @@
 		}
 	});
 
+	// Cleanup preview URL on dialog close
+	$effect(() => {
+		if (!open) {
+			untrack(() => {
+				if (previewUrl) {
+					URL.revokeObjectURL(previewUrl);
+					previewUrl = null;
+				}
+				selectedDiscoveryId = null;
+			});
+		}
+	});
+
 	async function handleConnect() {
 		try {
 			isConnecting = true;
 			const cameraId = crypto.randomUUID();
-			
-			let config: any;
+
+			let config: {
+				id: string;
+				name: string;
+				type: string;
+				url: string | null;
+				device_id: string | null;
+			};
+
 			if (activeTab === 'discovery' && selectedDiscoveryId) {
-				const cam = discoveredCameras.find(c => c.id === selectedDiscoveryId);
+				const cam = discoveredCameras.find((c) => c.id === selectedDiscoveryId);
 				if (!cam) return;
+				const isLocal = cam.type === 'v4l2' || cam.type === 'local';
 				config = {
 					id: cameraId,
 					name: cam.name,
-					type: (cam.type === 'v4l2' || cam.type === 'local') ? 'stream' : 'rtsp',
-					url: cam.type === 'onvif' ? cam.url : null,
-					device_id: (cam.type === 'v4l2' || cam.type === 'local') ? cam.url : null
+					type: isLocal ? 'stream' : 'rtsp',
+					url: !isLocal ? cam.url : null,
+					device_id: isLocal ? cam.url : null
 				};
 			} else {
 				config = {
@@ -117,12 +163,10 @@
 				throw new Error(errData.detail || 'Failed to create camera');
 			}
 
-			videoStore.setVideoType(config.type === 'rtsp' ? 'rtsp' : 'stream');
-			if (config.type === 'rtsp') {
-				videoStore.setVideoUrl(config.url);
-			} else {
-				videoStore.setVideoStream(null); // Backend will handle the stream
-			}
+			// All camera types use 'rtsp' video type for the create page
+			// since the backend serves all feeds via MJPEG at /api/livestream/{id}/video
+			videoStore.setVideoType('rtsp');
+			videoStore.setVideoUrl(config.url || config.device_id);
 
 			open = false;
 			goto(`/create/${cameraId}`);
@@ -160,15 +204,23 @@
 			<Tabs.Content value="discovery" class="space-y-4 py-4">
 				<div class="flex items-center justify-between">
 					<Label>Available Devices</Label>
-					<Button variant="ghost" size="sm" onclick={runDiscovery} disabled={isDiscovering} class="h-8 cursor-pointer">
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={runDiscovery}
+						disabled={isDiscovering}
+						class="h-8 cursor-pointer"
+					>
 						<RefreshCw class="mr-2 size-3 {isDiscovering ? 'animate-spin' : ''}" />
 						Refresh
 					</Button>
 				</div>
 
-				<div class="max-h-[300px] space-y-2 overflow-y-auto rounded-md border p-2">
+				<div class="max-h-[180px] space-y-2 overflow-y-auto rounded-md border p-2">
 					{#if isDiscovering && discoveredCameras.length === 0}
-						<div class="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
+						<div
+							class="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground"
+						>
 							<Loader2 class="mb-2 size-6 animate-spin" />
 							Scanning local network and hardware...
 						</div>
@@ -179,24 +231,47 @@
 					{:else}
 						{#each discoveredCameras as cam (cam.id)}
 							<button
-								class="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent {selectedDiscoveryId === cam.id ? 'border-primary bg-primary/5' : ''}"
-								onclick={() => selectedDiscoveryId = cam.id}
+								class="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent {selectedDiscoveryId ===
+								cam.id
+									? 'border-primary bg-primary/5'
+									: ''}"
+								onclick={() => selectCamera(cam.id)}
 							>
-								<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
-									{#if cam.type === 'v4l2'}
+								<div
+									class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted"
+								>
+									{#if cam.type === 'v4l2' || cam.type === 'local'}
 										<Camera class="size-5 text-muted-foreground" />
 									{:else}
 										<Globe class="size-5 text-muted-foreground" />
 									{/if}
 								</div>
 								<div class="flex-1 overflow-hidden">
-									<div class="truncated font-medium">{cam.name}</div>
+									<div class="truncate font-medium">{cam.name}</div>
 									<div class="truncate text-xs text-muted-foreground">
 										{cam.type.toUpperCase()} • {cam.url}
 									</div>
 								</div>
 							</button>
 						{/each}
+					{/if}
+				</div>
+
+				<!-- Camera preview -->
+				<div
+					class="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-black"
+				>
+					{#if isLoadingPreview}
+						<div class="flex flex-col items-center gap-2">
+							<Loader2 class="size-6 animate-spin text-muted-foreground" />
+							<span class="text-sm text-muted-foreground">Loading preview...</span>
+						</div>
+					{:else if previewUrl}
+						<img src={previewUrl} alt="Camera preview" class="h-full w-full object-contain" />
+					{:else}
+						<div class="text-sm text-muted-foreground">
+							Select a camera to preview
+						</div>
 					{/if}
 				</div>
 			</Tabs.Content>
@@ -255,7 +330,7 @@
 			<Button
 				variant="outline"
 				class="cursor-pointer"
-				onclick={() => open = false}
+				onclick={() => (open = false)}
 				disabled={isConnecting}>Cancel</Button
 			>
 			<Button
