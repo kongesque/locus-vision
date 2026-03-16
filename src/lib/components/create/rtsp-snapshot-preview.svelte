@@ -75,12 +75,30 @@
 		};
 	}
 
+	let dimsPollTimer: ReturnType<typeof setInterval> | null = null;
+
+	function startDimsPoll() {
+		if (dimsPollTimer) return;
+		dimsPollTimer = setInterval(() => {
+			const img = videoRef as unknown as HTMLImageElement | undefined;
+			if (img && img.naturalWidth > 0) {
+				isLoading = false;
+				updateDims();
+				clearInterval(dimsPollTimer!);
+				dimsPollTimer = null;
+			}
+		}, 100);
+	}
+
 	function initStream() {
 		if (!url) return;
 
-		// Non-HLS (RTSP / local device): a static snapshot is shown for zone drawing.
-		// isLoading is cleared by the img's onload handler in the template.
-		if (!isHlsUrl(url)) return;
+		// Non-HLS (RTSP / local device): raw MJPEG preview stream (no inference).
+		// onload doesn't fire for MJPEG, so we poll for naturalWidth instead.
+		if (!isHlsUrl(url)) {
+			startDimsPoll();
+			return;
+		}
 
 		if (!videoRef) return;
 
@@ -155,6 +173,10 @@
 
 		return () => {
 			observer.disconnect();
+			if (dimsPollTimer) {
+				clearInterval(dimsPollTimer);
+				dimsPollTimer = null;
+			}
 			if (hlsInstance) {
 				hlsInstance.destroy();
 				hlsInstance = null;
@@ -195,14 +217,13 @@
 				onresize={updateDims}
 			></video>
 		{:else}
-			<!-- Static snapshot for zone drawing — no inference, reliable onload -->
+			<!-- Raw MJPEG preview stream — no inference, dimensions polled via startDimsPoll() -->
 			<img
 				bind:this={videoRef as any}
-				src={`http://localhost:8000/api/cameras/snapshot?source=${encodeURIComponent(url)}`}
-				alt="Camera snapshot"
+				src={`http://localhost:8000/api/cameras/${cameraId}/preview-stream`}
+				alt="Camera preview"
 				class="pointer-events-none max-h-full max-w-full object-contain"
-				onload={() => { isLoading = false; updateDims(); }}
-				onerror={() => { isLoading = false; error = 'Failed to load camera snapshot'; }}
+				onerror={() => { isLoading = false; error = 'Failed to connect to camera'; }}
 				crossorigin="anonymous"
 			/>
 		{/if}

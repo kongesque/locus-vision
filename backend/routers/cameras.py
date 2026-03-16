@@ -1,8 +1,11 @@
 """CRUD router for camera management."""
 
 import uuid
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+import asyncio
+import threading
+import cv2
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from typing import List
 from database import get_db
 from models import CameraCreate, CameraUpdate, CameraResponse
@@ -44,6 +47,63 @@ async def camera_snapshot(source: str):
         return Response(content=buffer.tobytes(), media_type="image/jpeg")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid source")
+
+
+@router.get("/{camera_id}/preview-stream")
+async def camera_preview_stream(camera_id: str, request: Request):
+    """Raw MJPEG stream for the create/configure page — no inference, just raw frames."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT type, url, device_id FROM cameras WHERE id = ?", (camera_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Camera not found")
+        cam = dict(row)
+    finally:
+        await db.close()
+
+    src = cam.get("device_id") or cam.get("url")
+    if src is None:
+        raise HTTPException(status_code=400, detail="Camera has no source configured")
+    src = int(src) if isinstance(src, str) and src.isdigit() else src
+
+    frame_queue: asyncio.Queue = asyncio.Queue(maxsize=4)
+    loop = asyncio.get_event_loop()
+    stop_event = threading.Event()
+
+    def capture_loop():
+        cap = cv2.VideoCapture(src)
+        if not cap.isOpened():
+            stop_event.set()
+            return
+        try:
+            while not stop_event.is_set():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                _, buf = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                if not frame_queue.full():
+                    asyncio.run_coroutine_threadsafe(frame_queue.put(buf.tobytes()), loop)
+        finally:
+            cap.release()
+
+    t = threading.Thread(target=capture_loop, daemon=True)
+    t.start()
+
+    async def generate():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    frame_bytes = await asyncio.wait_for(frame_queue.get(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    break
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        finally:
+            stop_event.set()
+
+    return StreamingResponse(generate(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @router.get("", response_model=List[CameraResponse])
