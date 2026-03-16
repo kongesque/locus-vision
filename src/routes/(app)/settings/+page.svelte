@@ -625,15 +625,20 @@
 			>
 				Cancel
 			</AlertDialog.Cancel>
-			<form method="POST" action="?/deleteAllMedia" use:enhance class="inline">
+			<form method="POST" action="?/deleteAllMedia"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						deleteAllMediaDialog = false;
+						deleteMediaConfirmText = '';
+					};
+				}}
+				class="inline"
+			>
 				<Button
 					type="submit"
 					variant="destructive"
 					disabled={deleteMediaConfirmText !== 'DELETE'}
-					onclick={() => {
-						deleteAllMediaDialog = false;
-						deleteMediaConfirmText = '';
-					}}
 				>
 					Delete All
 				</Button>
