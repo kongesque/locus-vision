@@ -35,7 +35,6 @@
 	let discoveredCameras = $state<DiscoveredCamera[]>([]);
 	let selectedDiscoveryId = $state<string | null>(null);
 	let previewUrl = $state<string | null>(null);
-	let isLoadingPreview = $state(false);
 
 	async function runDiscovery() {
 		try {
@@ -50,27 +49,13 @@
 		}
 	}
 
-	async function selectCamera(camId: string) {
+	function selectCamera(camId: string) {
 		selectedDiscoveryId = camId;
 		const cam = discoveredCameras.find((c) => c.id === camId);
 		if (!cam) return;
 
-		// Load a preview snapshot from the backend
-		try {
-			isLoadingPreview = true;
-			previewUrl = null;
-			const res = await fetch(
-				`http://localhost:8000/api/cameras/snapshot?source=${encodeURIComponent(cam.url)}`
-			);
-			if (res.ok) {
-				const blob = await res.blob();
-				previewUrl = URL.createObjectURL(blob);
-			}
-		} catch (err) {
-			console.error('Preview error:', err);
-		} finally {
-			isLoadingPreview = false;
-		}
+		// Point directly at the MJPEG preview stream (browser renders it natively)
+		previewUrl = `http://localhost:8000/api/cameras/preview?source=${encodeURIComponent(cam.url)}`;
 	}
 
 	// Manual RTSP/HTTP form fields
@@ -109,10 +94,7 @@
 	$effect(() => {
 		if (!open) {
 			untrack(() => {
-				if (previewUrl) {
-					URL.revokeObjectURL(previewUrl);
-					previewUrl = null;
-				}
+				previewUrl = null;
 				selectedDiscoveryId = null;
 			});
 		}
@@ -261,12 +243,7 @@
 				<div
 					class="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-black"
 				>
-					{#if isLoadingPreview}
-						<div class="flex flex-col items-center gap-2">
-							<Loader2 class="size-6 animate-spin text-muted-foreground" />
-							<span class="text-sm text-muted-foreground">Loading preview...</span>
-						</div>
-					{:else if previewUrl}
+					{#if previewUrl}
 						<img src={previewUrl} alt="Camera preview" class="h-full w-full object-contain" />
 					{:else}
 						<div class="text-sm text-muted-foreground">
