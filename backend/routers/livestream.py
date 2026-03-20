@@ -19,15 +19,17 @@ router = APIRouter(
 
 
 async def _load_camera_config(camera_id: str):
-    """Load camera zones/classes/model/fps from the database."""
+    """Load camera source/zones/classes/model/fps from the database."""
     db = await get_db()
     try:
         cursor = await db.execute("SELECT * FROM cameras WHERE id = ?", (camera_id,))
         row = await cursor.fetchone()
         if not row:
-            return None, None, "yolo11n", 24
-        
+            return None, None, None, "yolo11n", 24
+
         cam = dict(row)
+        raw_source = cam.get("device_id") or cam.get("url")
+        source = int(raw_source) if isinstance(raw_source, str) and raw_source.isdigit() else raw_source
         zones = None
         classes = None
         model_name = cam.get("model_name", "yolo11n")
@@ -45,7 +47,7 @@ async def _load_camera_config(camera_id: str):
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        return zones, classes, model_name, fps
+        return source, zones, classes, model_name, fps
     finally:
         await db.close()
 
@@ -56,9 +58,9 @@ async def video_feed(camera_id: str, request: Request):
     Returns a continuous MJPEG stream.
     Loads camera config from DB to initialize zones/classes on first connect.
     """
-    zones, classes, model_name, fps = await _load_camera_config(camera_id)
+    source, zones, classes, model_name, fps = await _load_camera_config(camera_id)
     stream_ctx = livestream_manager.get_or_create_stream(
-        camera_id, zones=zones, classes=classes, model_name=model_name, fps=fps
+        camera_id, zones=zones, classes=classes, model_name=model_name, fps=fps, source=source
     )
     client_queue = asyncio.Queue(maxsize=30)
     stream_ctx.video_clients.append(client_queue)
@@ -82,9 +84,9 @@ async def sse_events(camera_id: str, request: Request):
     """
     Returns a Server-Sent Events (SSE) stream of detection data.
     """
-    zones, classes, model_name, fps = await _load_camera_config(camera_id)
+    source, zones, classes, model_name, fps = await _load_camera_config(camera_id)
     stream_ctx = livestream_manager.get_or_create_stream(
-        camera_id, zones=zones, classes=classes, model_name=model_name, fps=fps
+        camera_id, zones=zones, classes=classes, model_name=model_name, fps=fps, source=source
     )
     client_queue = asyncio.Queue(maxsize=100)
     stream_ctx.event_clients.append(client_queue)
