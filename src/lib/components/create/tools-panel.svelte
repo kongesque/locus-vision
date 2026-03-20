@@ -105,6 +105,17 @@
 	let openFullFrameCombobox = $state(false);
 
 	let activeTab = $state<'zone-based' | 'full-frame'>('zone-based');
+	let scrollContainer: HTMLDivElement | undefined = $state();
+	let prevZoneCount = $state(0);
+
+	$effect(() => {
+		if (zones.length > prevZoneCount && scrollContainer) {
+			tick().then(() => {
+				scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+			});
+			prevZoneCount = zones.length;
+		}
+	});
 
 	function handleStartEditing(id: string, currentName: string) {
 		editingId = id;
@@ -147,15 +158,15 @@
 </script>
 
 <Card.Root class="flex flex-col overflow-hidden">
-	<div class="flex-1 min-h-0 overflow-y-auto p-4">
-		<div class="space-y-4">
-			<h3 class="font-semibold">Create</h3>
+	<div bind:this={scrollContainer} class="flex-1 min-h-0 overflow-y-auto p-3">
+		<div class="space-y-3">
+			<h3 class="text-sm font-semibold">Create</h3>
 			<Separator />
 
 			<!-- Model Selection -->
 			<div>
-				<div class="mb-2 flex items-center justify-between">
-					<div class="font-semibold text-foreground">Model</div>
+				<div class="mb-1.5 flex items-center justify-between">
+					<div class="text-sm font-semibold text-foreground">Model</div>
 					<Tooltip.Root>
 						<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 							<Info class="h-4 w-4" />
@@ -202,8 +213,8 @@
 				</Select.Root>
 
 				<!-- Inference Precision -->
-				<div class="mt-3">
-					<span class="mb-1.5 block text-[12px] font-medium text-muted-foreground"
+				<div class="mt-2">
+					<span class="mb-1 block text-xs font-medium text-muted-foreground"
 						>Inference Precision</span
 					>
 					<ToggleGroup.Root
@@ -259,7 +270,7 @@
 
 				<!-- Download Status UI -->
 				{#if isModelMissing}
-					<div class="mt-4 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+					<div class="mt-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5">
 						<div class="flex flex-col gap-2">
 							<div class="text-xs font-medium text-amber-600 dark:text-amber-500">
 								Model not downloaded
@@ -307,8 +318,8 @@
 
 			<!-- FPS -->
 			<div>
-				<div class="mb-2 flex items-center justify-between">
-					<div class="font-semibold text-foreground">FPS</div>
+				<div class="mb-1.5 flex items-center justify-between">
+					<div class="text-sm font-semibold text-foreground">FPS</div>
 					<Tooltip.Root>
 						<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 							<Info class="h-4 w-4" />
@@ -320,7 +331,7 @@
 						</Tooltip.Content>
 					</Tooltip.Root>
 				</div>
-				<div class="flex items-center gap-4">
+				<div class="flex items-center gap-3">
 					<Slider
 						type="single"
 						value={fps}
@@ -345,15 +356,15 @@
 							// Snap back to current fps if empty or invalid on blur
 							e.currentTarget.value = String(fps);
 						}}
-						class="h-8 w-16 px-2 text-center font-mono text-xs"
+						class="h-7 w-14 px-1.5 text-center font-mono text-xs"
 					/>
 				</div>
 			</div>
 
 			<!-- Confidence Threshold -->
 			<div>
-				<div class="mb-2 flex items-center justify-between">
-					<div class="font-semibold text-foreground">Confidence</div>
+				<div class="mb-1.5 flex items-center justify-between">
+					<div class="text-sm font-semibold text-foreground">Confidence</div>
 					<Tooltip.Root>
 						<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 							<Info class="h-4 w-4" />
