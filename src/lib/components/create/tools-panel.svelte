@@ -376,7 +376,7 @@
 						</Tooltip.Content>
 					</Tooltip.Root>
 				</div>
-				<div class="flex items-center gap-4">
+				<div class="flex items-center gap-3">
 					<Slider
 						type="single"
 						value={confidenceThreshold}
@@ -401,7 +401,7 @@
 						onblur={(e) => {
 							e.currentTarget.value = String(confidenceThreshold);
 						}}
-						class="h-8 w-16 px-2 text-center font-mono text-xs"
+						class="h-7 w-14 px-1.5 text-center font-mono text-xs"
 					/>
 				</div>
 			</div>
@@ -410,8 +410,8 @@
 
 			<!-- Tools & Zones -->
 			<div>
-				<div class="mb-2 flex items-center justify-between">
-					<div class="font-semibold text-foreground">Tools</div>
+				<div class="mb-1.5 flex items-center justify-between">
+					<div class="text-sm font-semibold text-foreground">Tools</div>
 					<Tooltip.Root>
 						<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 							<Info class="h-4 w-4" />
@@ -724,10 +724,10 @@
 		</div>
 	</div>
 
-	<div class="border-t p-4">
-		<Separator class="my-4" />
+	<div class="border-t p-3">
+		<Separator class="my-2.5" />
 		<Button
-			class="h-12 w-full"
+			class="h-10 w-full text-sm"
 			disabled={(activeTab === 'zone-based' && zones.length === 0) ||
 				isModelMissing ||
 				isDownloadingModel}
