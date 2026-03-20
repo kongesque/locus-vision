@@ -356,7 +356,7 @@
 							// Snap back to current fps if empty or invalid on blur
 							e.currentTarget.value = String(fps);
 						}}
-						class="h-7 w-14 px-1.5 text-center font-mono text-xs"
+						class="h-7 w-16 px-1 text-center font-mono text-xs"
 					/>
 				</div>
 			</div>
@@ -401,7 +401,7 @@
 						onblur={(e) => {
 							e.currentTarget.value = String(confidenceThreshold);
 						}}
-						class="h-7 w-14 px-1.5 text-center font-mono text-xs"
+						class="h-8 w-16 px-1 text-center font-mono text-xs"
 					/>
 				</div>
 			</div>
