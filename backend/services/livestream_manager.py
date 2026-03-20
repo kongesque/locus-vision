@@ -23,7 +23,7 @@ class LivestreamManager:
         self.active_streams = {}  # camera_id -> StreamContext
         self.lock = threading.Lock()
 
-    def get_or_create_stream(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24, source=None, enable_hw_accel=True):
+    def get_or_create_stream(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24, source=None, enable_hw_accel=True, conf_threshold=None):
         with self.lock:
             if camera_id not in self.active_streams:
                 self.active_streams[camera_id] = StreamContext(
@@ -34,6 +34,7 @@ class LivestreamManager:
                     fps=fps,
                     source=source,
                     enable_hw_accel=enable_hw_accel,
+                    conf_threshold=conf_threshold,
                 )
                 self.active_streams[camera_id].start()
             return self.active_streams[camera_id]
@@ -54,7 +55,7 @@ class LivestreamManager:
             stream.stop()
 
 class StreamContext:
-    def __init__(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24, source=None, enable_hw_accel=True):
+    def __init__(self, camera_id: str, zones=None, classes=None, model_name="yolo11n", fps=24, source=None, enable_hw_accel=True, conf_threshold=None):
         self.camera_id = camera_id
         self.source = source if source is not None else 0  # Default to webcam 0
         self.enable_hw_accel = enable_hw_accel
@@ -67,7 +68,8 @@ class StreamContext:
             zones=zones,
             full_frame_classes=classes,
             mode="live",
-            camera_id=camera_id
+            camera_id=camera_id,
+            conf_threshold=conf_threshold
         )
         
         self._running = False

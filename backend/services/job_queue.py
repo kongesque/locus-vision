@@ -185,6 +185,7 @@ class VideoJobQueue:
         full_frame_classes = json.loads(classes_raw) if isinstance(classes_raw, str) else classes_raw
 
         target_fps = task.get("fps") or 12
+        conf_threshold = task.get("confidence_threshold") or 0.15
 
         print(f"[JobQueue] Processing task {task_id} ({task.get('filename', '?')})")
 
@@ -194,7 +195,8 @@ class VideoJobQueue:
                 zones=zones,
                 full_frame_classes=full_frame_classes,
                 mode="batch",
-                camera_id=task_id
+                camera_id=task_id,
+                conf_threshold=conf_threshold
             )
 
             cap = cv2.VideoCapture(input_path)

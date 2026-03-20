@@ -280,21 +280,24 @@ class OnnxDetector:
 _detector_cache: dict[str, OnnxDetector] = {}
 
 
-def get_detector(model_name: str) -> OnnxDetector:
+def get_detector(model_name: str, conf_threshold: float | None = None) -> OnnxDetector:
     """
     Get or create a cached OnnxDetector for the given model name.
     Looks for `data/models/{model_name}.onnx`.
+    When conf_threshold is specified, a separate instance is cached per threshold.
     """
-    if model_name not in _detector_cache:
+    cache_key = f"{model_name}@{conf_threshold}" if conf_threshold is not None else model_name
+    if cache_key not in _detector_cache:
         model_path = os.path.join(MODELS_DIR, f"{model_name}.onnx")
         if not os.path.exists(model_path):
             raise FileNotFoundError(
                 f"Model '{model_name}.onnx' not found in {MODELS_DIR}. "
                 f"Run: python scripts/export_model.py {model_name}"
             )
-        print(f"[OnnxDetector] Loading model: {model_path}")
-        _detector_cache[model_name] = OnnxDetector(model_path)
-    return _detector_cache[model_name]
+        print(f"[OnnxDetector] Loading model: {model_path} (conf={conf_threshold or 0.15})")
+        ct = conf_threshold if conf_threshold is not None else 0.15
+        _detector_cache[cache_key] = OnnxDetector(model_path, conf_threshold=ct)
+    return _detector_cache[cache_key]
 
 
 def list_models() -> list[str]:

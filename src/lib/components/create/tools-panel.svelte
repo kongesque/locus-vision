@@ -61,6 +61,8 @@
 		onPrecisionChange: (precision: 'fp32' | 'fp16' | 'int8') => void;
 		fps: number;
 		onFpsChange: (fps: number) => void;
+		confidenceThreshold: number;
+		onConfidenceThresholdChange: (value: number) => void;
 	}
 
 	let {
@@ -87,7 +89,9 @@
 		onModelChange,
 		onPrecisionChange,
 		fps,
-		onFpsChange
+		onFpsChange,
+		confidenceThreshold,
+		onConfidenceThresholdChange
 	}: Props = $props();
 
 	// Helper: find model info for the currently selected model
@@ -338,6 +342,51 @@
 				onblur={(e) => {
 					// Snap back to current fps if empty or invalid on blur
 					e.currentTarget.value = String(fps);
+				}}
+				class="h-8 w-16 px-2 text-center font-mono text-xs"
+			/>
+		</div>
+	</div>
+
+	<!-- Confidence Threshold -->
+	<div>
+		<div class="mb-2 flex items-center justify-between">
+			<div class="font-semibold text-foreground">Confidence</div>
+			<Tooltip.Root>
+				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+					<Info class="h-4 w-4" />
+					<span class="sr-only">Info</span>
+				</Tooltip.Trigger>
+				<Tooltip.Content side="left">
+					<p>Higher = fewer, more confident detections.</p>
+					<p>Lower = more detections, more noise.</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		</div>
+		<div class="flex items-center gap-4">
+			<Slider
+				type="single"
+				value={confidenceThreshold}
+				min={0.05}
+				max={0.95}
+				step={0.05}
+				onValueChange={(v: number) => onConfidenceThresholdChange(v)}
+				class="flex-1"
+			/>
+			<Input
+				type="number"
+				min={0.05}
+				max={0.95}
+				step={0.05}
+				value={confidenceThreshold}
+				oninput={(e) => {
+					const val = parseFloat(e.currentTarget.value);
+					if (!isNaN(val) && val >= 0.05 && val <= 0.95) {
+						onConfidenceThresholdChange(Math.round(val * 100) / 100);
+					}
+				}}
+				onblur={(e) => {
+					e.currentTarget.value = String(confidenceThreshold);
 				}}
 				class="h-8 w-16 px-2 text-center font-mono text-xs"
 			/>

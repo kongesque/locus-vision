@@ -64,6 +64,7 @@ async def init_db():
                 format        TEXT    NULL,
                 model_name    TEXT    NULL,
                 fps           INTEGER NULL DEFAULT 12,
+                confidence_threshold REAL NULL DEFAULT 0.15,
                 total_count   INTEGER NULL,
                 zone_counts   TEXT    NULL,
                 zones         TEXT    NULL,
@@ -79,6 +80,7 @@ async def init_db():
                 device_id   TEXT    NULL,
                 model_name  TEXT    NOT NULL DEFAULT 'yolo11n',
                 fps         INTEGER NOT NULL DEFAULT 24,
+                confidence_threshold REAL NOT NULL DEFAULT 0.15,
                 status      TEXT    NOT NULL DEFAULT 'active',
                 zones       TEXT    NULL,
                 classes     TEXT    NULL,
@@ -100,6 +102,7 @@ async def init_db():
                 "error_message": "ALTER TABLE video_tasks ADD COLUMN error_message TEXT NULL",
                 "name": "ALTER TABLE video_tasks ADD COLUMN name TEXT NULL",
                 "fps": "ALTER TABLE video_tasks ADD COLUMN fps INTEGER NULL DEFAULT 12",
+                "confidence_threshold": "ALTER TABLE video_tasks ADD COLUMN confidence_threshold REAL NULL DEFAULT 0.15",
             }
             for col_name, sql in migrations.items():
                 if col_name not in columns:
@@ -115,6 +118,7 @@ async def init_db():
             camera_migrations = {
                 "updated_at": "ALTER TABLE cameras ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
                 "fps": "ALTER TABLE cameras ADD COLUMN fps INTEGER NOT NULL DEFAULT 24",
+                "confidence_threshold": "ALTER TABLE cameras ADD COLUMN confidence_threshold REAL NOT NULL DEFAULT 0.15",
             }
             for col_name, sql in camera_migrations.items():
                 if col_name not in columns:

@@ -44,6 +44,7 @@
 	let selectedModel = $state<string>('yolo11n');
 	let selectedPrecision = $state<'fp32' | 'fp16' | 'int8'>('int8');
 	let downloadedModels = $state<string[]>([]);
+	let confidenceThreshold = $state<number>(0.15);
 
 	// FPS: default depends on flow type (12 = video analytics, 24 = livestream)
 	const defaultFps = $derived(videoStore.videoType === 'file' ? 12 : 24);
@@ -202,6 +203,7 @@
 			formData.append('classes', JSON.stringify(finalGlobalClasses));
 			formData.append('model_name', resolvedModelName);
 			formData.append('fps', String(fps));
+			formData.append('confidence_threshold', String(confidenceThreshold));
 
 			// Fire-and-forget: upload in background
 			fetch(`http://localhost:8000/api/video/${taskId}/process`, {
@@ -235,7 +237,8 @@
 						zones: JSON.stringify(normalizedZones),
 						classes: JSON.stringify(consolidatedClasses),
 						model_name: resolvedModelName,
-						fps: fps
+						fps: fps,
+						confidence_threshold: confidenceThreshold
 					})
 				});
 
@@ -301,6 +304,8 @@
 					modelDownloadStatus = null; // reset status on change
 				}}
 				onFpsChange={(v) => (fps = v)}
+				{confidenceThreshold}
+				onConfidenceThresholdChange={(v) => (confidenceThreshold = v)}
 			/>
 		</div>
 	</div>

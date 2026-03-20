@@ -65,8 +65,8 @@ class AnalyticsEngine:
         elif cross < 0: return -1  # "out"
         return 0
 
-    def __init__(self, model_name: str = "yolo11n", zones: list = None, full_frame_classes: list = None, mode: str = "live", camera_id: str = "default"):
-        self.detector: OnnxDetector = get_detector(model_name)
+    def __init__(self, model_name: str = "yolo11n", zones: list = None, full_frame_classes: list = None, mode: str = "live", camera_id: str = "default", conf_threshold: float | None = None):
+        self.detector: OnnxDetector = get_detector(model_name, conf_threshold=conf_threshold)
         self.mode = mode
         self.camera_id = camera_id
         

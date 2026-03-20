@@ -26,6 +26,7 @@ async def process_video(
     model_name: str = Form("yolo11n"),
     classes: str = Form("[]"),
     fps: int = Form(12),
+    confidence_threshold: float = Form(0.15),
 ):
     """
     Upload a video and enqueue it for background processing.
@@ -47,9 +48,9 @@ async def process_video(
     try:
         await db.execute(
             """INSERT OR REPLACE INTO video_tasks
-               (id, filename, status, progress, model_name, fps, zones, classes)
-               VALUES (?, ?, 'pending', 0, ?, ?, ?, ?)""",
-            (task_id, video.filename, model_name, fps, json.dumps(zones_data), json.dumps(classes_data)),
+               (id, filename, status, progress, model_name, fps, confidence_threshold, zones, classes)
+               VALUES (?, ?, 'pending', 0, ?, ?, ?, ?, ?)""",
+            (task_id, video.filename, model_name, fps, confidence_threshold, json.dumps(zones_data), json.dumps(classes_data)),
         )
         await db.commit()
     finally:
