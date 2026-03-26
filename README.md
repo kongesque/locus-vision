@@ -20,11 +20,7 @@
 
 Locus Vision is a **self-hosted video analytics platform** built for edge devices. It performs real-time **object detection and tracking** using YOLO + ONNX Runtime, with support for **INT8/FP16 quantized models** that cut model size by 70% while maintaining accuracy. Everything stays local — no cloud, no subscriptions, no data leaving your network.
 
-<p align="center">
-  <a href="https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af">
-    <img src="https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af" width="100%" alt="Locus Vision demo — real-time object detection, tracking, and analytics dashboard running on edge hardware" />
-  </a>
-</p>
+https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 
 ## Features
 
@@ -90,6 +86,5 @@ Contributions welcome — bug reports, feature requests, and pull requests all h
 
 ---
 
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/kongesque">kongesque</a>
-</p>
+Made with ❤️ by <a href="https://github.com/kongesque">kongesque</a>
+
