@@ -1,3 +1,0 @@
-"""
-Locus API Routes
-"""
