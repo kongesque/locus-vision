@@ -13,6 +13,7 @@
 	} from '@lucide/svelte';
 	import type { PageData } from './$types';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -184,28 +185,35 @@
 		</div>
 
 		<div class="flex items-center gap-3">
-			<select
-				class="flex h-10 w-[200px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+			<Select.Root
+				type="single"
 				bind:value={selectedCamera}
-				onchange={loadAnalytics}
+				onValueChange={() => loadAnalytics()}
+				disabled={data.cameras?.length === 0}
 			>
-				{#if data.cameras?.length === 0}
-					<option value="">No cameras available</option>
-				{/if}
-				{#each data.cameras as cam}
-					<option value={cam.id}>{cam.name || cam.id}</option>
-				{/each}
-			</select>
+				<Select.Trigger class="w-[200px]">
+					{data.cameras?.find((c: { id: string; name?: string }) => c.id === selectedCamera)?.name || selectedCamera || 'Select camera'}
+				</Select.Trigger>
+				<Select.Content>
+					{#if data.cameras?.length === 0}
+						<Select.Item value="" label="No cameras available" />
+					{/if}
+					{#each data.cameras as cam}
+						<Select.Item value={cam.id} label={cam.name || cam.id} />
+					{/each}
+				</Select.Content>
+			</Select.Root>
 
-			<select
-				class="flex h-10 w-[140px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-				bind:value={timeRange}
-				onchange={loadAnalytics}
-			>
-				<option value="24h">Last 24 Hours</option>
-				<option value="7d">Last 7 Days</option>
-				<option value="30d">Last 30 Days</option>
-			</select>
+			<Select.Root type="single" bind:value={timeRange} onValueChange={() => loadAnalytics()}>
+				<Select.Trigger class="w-[140px]">
+					{{ '24h': 'Last 24 Hours', '7d': 'Last 7 Days', '30d': 'Last 30 Days' }[timeRange]}
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="24h" label="Last 24 Hours" />
+					<Select.Item value="7d" label="Last 7 Days" />
+					<Select.Item value="30d" label="Last 30 Days" />
+				</Select.Content>
+			</Select.Root>
 
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger
