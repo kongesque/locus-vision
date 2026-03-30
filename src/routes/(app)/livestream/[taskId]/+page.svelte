@@ -669,7 +669,7 @@
 		</div>
 
 		<!-- ─── Right Sidebar: Activity Feed (NVR-style) ─── -->
-		<ActivityFeed bind:this={activityFeed} {eventTypeConfig} {isConnected} bind:hasActiveAlert />
+		<ActivityFeed bind:this={activityFeed} {eventTypeConfig} {isConnected} bind:hasActiveAlert cameraId={taskId} />
 	</div>
 
 	<!-- ─── System Health Footer ─── -->

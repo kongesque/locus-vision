@@ -166,7 +166,7 @@ $effect(() => {
 
 ---
 
-## Priority 3 — Link to Full Event History (Frontend)
+## ✅ Priority 3 — Link to Full Event History (Frontend)
 
 **Problem:** Feed is capped at 200 events with no escape hatch to the full searchable history.
 

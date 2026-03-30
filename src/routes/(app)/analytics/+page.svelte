@@ -14,7 +14,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let selectedCamera = $state(untrack(() => data.cameras?.[0]?.id || ''));
+	let selectedCamera = $state(untrack(() => data.preselectedCamera || data.cameras?.[0]?.id || ''));
 	let timeRange = $state('7d');
 	let isLoading = $state(false);
 

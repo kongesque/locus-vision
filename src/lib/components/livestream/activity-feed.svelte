@@ -29,11 +29,13 @@
 	let {
 		eventTypeConfig,
 		isConnected = false,
-		hasActiveAlert = $bindable(false)
+		hasActiveAlert = $bindable(false),
+		cameraId = ''
 	}: {
 		eventTypeConfig: Record<string, { label: string; color: string; bgColor: string }>;
 		isConnected?: boolean;
 		hasActiveAlert?: boolean;
+		cameraId?: string;
 	} = $props();
 
 	// ─── Feed State ───
@@ -388,6 +390,16 @@
 						</li>
 					{/each}
 				</ul>
+				{#if activityLogs.length >= 200 && cameraId}
+					<div class="border-t border-border/20 px-4 py-2.5 text-center">
+						<a
+							href="/analytics?camera={cameraId}"
+							class="text-[11px] text-blue-400 transition-colors hover:text-blue-300"
+						>
+							Showing 200 most recent · View full history →
+						</a>
+					</div>
+				{/if}
 			{/if}
 
 			{#if hasNewEvents}
