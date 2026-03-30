@@ -3,6 +3,7 @@
 	import {
 		Activity,
 		Download,
+		ChevronDown,
 		Calendar,
 		Map,
 		BarChart3,
@@ -11,6 +12,7 @@
 		TrendingUp
 	} from '@lucide/svelte';
 	import type { PageData } from './$types';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -156,7 +158,7 @@
 		}
 	});
 
-	function handleDownloadCsv() {
+	function handleDownload(format: 'csv' | 'json') {
 		if (!selectedCamera) return;
 		const end = new Date();
 		const start = new Date();
@@ -164,19 +166,7 @@
 		else if (timeRange === '7d') start.setDate(start.getDate() - 7);
 		else if (timeRange === '30d') start.setDate(start.getDate() - 30);
 
-		const url = `http://127.0.0.1:8000/api/analytics/export?camera_id=${selectedCamera}&start_time=${start.toISOString()}&end_time=${end.toISOString()}&format=csv`;
-		window.open(url, '_blank');
-	}
-
-	function handleDownloadJson() {
-		if (!selectedCamera) return;
-		const end = new Date();
-		const start = new Date();
-		if (timeRange === '24h') start.setHours(start.getHours() - 24);
-		else if (timeRange === '7d') start.setDate(start.getDate() - 7);
-		else if (timeRange === '30d') start.setDate(start.getDate() - 30);
-
-		const url = `http://127.0.0.1:8000/api/analytics/export?camera_id=${selectedCamera}&start_time=${start.toISOString()}&end_time=${end.toISOString()}&format=json`;
+		const url = `http://127.0.0.1:8000/api/analytics/export?camera_id=${selectedCamera}&start_time=${start.toISOString()}&end_time=${end.toISOString()}&format=${format}`;
 		window.open(url, '_blank');
 	}
 </script>
@@ -217,18 +207,26 @@
 				<option value="30d">Last 30 Days</option>
 			</select>
 
-			<button
-				class="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium whitespace-nowrap text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-				onclick={handleDownloadCsv}
-			>
-				<Download class="mr-2 h-4 w-4" /> Export CSV
-			</button>
-			<button
-				class="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium whitespace-nowrap shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-				onclick={handleDownloadJson}
-			>
-				<Download class="mr-2 h-4 w-4" /> Export JSON
-			</button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger
+					disabled={!selectedCamera || isLoading}
+					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium whitespace-nowrap text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+				>
+					<Download class="h-4 w-4" />
+					Export
+					<ChevronDown class="h-3 w-3 opacity-70" />
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-40">
+					<DropdownMenu.Item onclick={() => handleDownload('csv')} class="gap-2">
+						<Download class="size-3.5" />
+						Export as CSV
+					</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => handleDownload('json')} class="gap-2">
+						<Download class="size-3.5" />
+						Export as JSON
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 		</div>
 	</div>
 
