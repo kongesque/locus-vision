@@ -13,6 +13,7 @@
 		ArrowDown,
 		Download
 	} from '@lucide/svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	// ─── Types ───
 	type EventType = string;
@@ -189,8 +190,6 @@
 	}
 
 	// ─── Export ───
-	let showExportMenu = $state(false);
-
 	function triggerDownload(content: string, filename: string, mime: string) {
 		const blob = new Blob([content], { type: mime });
 		const url = URL.createObjectURL(blob);
@@ -202,7 +201,6 @@
 	}
 
 	function exportCsv() {
-		showExportMenu = false;
 		const rows = filteredLogs
 			.map((e) => `${e.time},${e.type},${JSON.stringify(e.message)},${e.zone ?? ''}`)
 			.join('\n');
@@ -214,7 +212,6 @@
 	}
 
 	function exportJson() {
-		showExportMenu = false;
 		const data = filteredLogs.map((e) => ({
 			time: e.time,
 			timestamp: e.timestamp ?? null,
@@ -285,39 +282,25 @@
 							<Pause class="size-3" />
 						{/if}
 					</button>
-					<div class="relative">
-						<button
-							onclick={() => (showExportMenu = !showExportMenu)}
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
 							disabled={filteredLogs.length === 0}
 							class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
 							title="Export events"
 						>
 							<Download class="size-3" />
-						</button>
-						{#if showExportMenu}
-							<div
-								class="absolute top-7 right-0 z-20 overflow-hidden rounded-lg border bg-card shadow-lg"
-								role="menu"
-							>
-								<button
-									onclick={exportCsv}
-									class="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-									role="menuitem"
-								>
-									<Download class="size-3" />
-									Export as CSV
-								</button>
-								<button
-									onclick={exportJson}
-									class="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-									role="menuitem"
-								>
-									<Download class="size-3" />
-									Export as JSON
-								</button>
-							</div>
-						{/if}
-					</div>
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-40">
+							<DropdownMenu.Item onclick={exportCsv} class="gap-2 text-[11px]">
+								<Download class="size-3" />
+								Export as CSV
+							</DropdownMenu.Item>
+							<DropdownMenu.Item onclick={exportJson} class="gap-2 text-[11px]">
+								<Download class="size-3" />
+								Export as JSON
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 					<button
 						onclick={clearActivityLogs}
 						class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
