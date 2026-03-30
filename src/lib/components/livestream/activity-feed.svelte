@@ -189,17 +189,45 @@
 	}
 
 	// ─── Export ───
-	function exportEvents() {
-		const rows = filteredLogs
-			.map((e) => `${e.time},${e.type},${JSON.stringify(e.message)},${e.zone ?? ''}`)
-			.join('\n');
-		const blob = new Blob([`time,type,message,zone\n${rows}`], { type: 'text/csv' });
+	let showExportMenu = $state(false);
+
+	function triggerDownload(content: string, filename: string, mime: string) {
+		const blob = new Blob([content], { type: mime });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `events-${new Date().toISOString().slice(0, 19)}.csv`;
+		a.download = filename;
 		a.click();
 		URL.revokeObjectURL(url);
+	}
+
+	function exportCsv() {
+		showExportMenu = false;
+		const rows = filteredLogs
+			.map((e) => `${e.time},${e.type},${JSON.stringify(e.message)},${e.zone ?? ''}`)
+			.join('\n');
+		triggerDownload(
+			`time,type,message,zone\n${rows}`,
+			`events-${new Date().toISOString().slice(0, 19)}.csv`,
+			'text/csv'
+		);
+	}
+
+	function exportJson() {
+		showExportMenu = false;
+		const data = filteredLogs.map((e) => ({
+			time: e.time,
+			timestamp: e.timestamp ?? null,
+			type: e.type,
+			message: e.message,
+			zone: e.zone ?? null,
+			severity: e.severity ?? null
+		}));
+		triggerDownload(
+			JSON.stringify(data, null, 2),
+			`events-${new Date().toISOString().slice(0, 19)}.json`,
+			'application/json'
+		);
 	}
 
 	// ─── Browser notifications ───
@@ -257,14 +285,39 @@
 							<Pause class="size-3" />
 						{/if}
 					</button>
-					<button
-						onclick={exportEvents}
-						disabled={filteredLogs.length === 0}
-						class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
-						title="Export events as CSV"
-					>
-						<Download class="size-3" />
-					</button>
+					<div class="relative">
+						<button
+							onclick={() => (showExportMenu = !showExportMenu)}
+							disabled={filteredLogs.length === 0}
+							class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+							title="Export events"
+						>
+							<Download class="size-3" />
+						</button>
+						{#if showExportMenu}
+							<div
+								class="absolute top-7 right-0 z-20 overflow-hidden rounded-lg border bg-card shadow-lg"
+								role="menu"
+							>
+								<button
+									onclick={exportCsv}
+									class="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+									role="menuitem"
+								>
+									<Download class="size-3" />
+									Export as CSV
+								</button>
+								<button
+									onclick={exportJson}
+									class="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+									role="menuitem"
+								>
+									<Download class="size-3" />
+									Export as JSON
+								</button>
+							</div>
+						{/if}
+					</div>
 					<button
 						onclick={clearActivityLogs}
 						class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
