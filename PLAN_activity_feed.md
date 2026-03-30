@@ -6,7 +6,7 @@ The activity feed component (`src/lib/components/livestream/activity-feed.svelte
 
 ---
 
-## Priority 1 — Persist Livestream Events to SQLite (Backend Restart Survival)
+## ✅ Priority 1 — Persist Livestream Events to SQLite (Backend Restart Survival)
 
 **Problem:** `recent-events` endpoint reads from `ctx.recent_events` (memory deque). Backend restart = empty feed.
 
@@ -114,7 +114,7 @@ conn.execute(
 
 ---
 
-## Priority 2 — Relative Timestamps with Full Timestamp on Hover (Frontend)
+## ✅ Priority 2 — Relative Timestamps with Full Timestamp on Hover (Frontend)
 
 **Problem:** Feed shows `HH:MM:SS` only. Events from hours ago lose date context, and there's no quick way to see the full ISO timestamp.
 

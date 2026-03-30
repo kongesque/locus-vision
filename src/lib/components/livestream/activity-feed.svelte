@@ -18,6 +18,7 @@
 	interface ActivityEvent {
 		id: string;
 		time: string;
+		timestamp?: number; // Unix seconds
 		message: string;
 		type: EventType;
 		zone?: string;
@@ -53,6 +54,22 @@
 	);
 
 	// ─── Helpers ───
+	function relativeTime(ts: number): string {
+		const diff = Math.floor(Date.now() / 1000 - ts);
+		if (diff < 60) return `${diff}s ago`;
+		if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+		if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+		return `${Math.floor(diff / 86400)}d ago`;
+	}
+
+	// Tick every 30s to keep relative times current
+	$effect(() => {
+		const interval = setInterval(() => {
+			activityLogs = [...activityLogs];
+		}, 30_000);
+		return () => clearInterval(interval);
+	});
+
 	function classifySeverity(type: string): 'critical' | 'warning' | 'info' {
 		if (type === 'alert' || type === 'capacity_warning' || type === 'wrong_way') return 'critical';
 		if (type === 'zone') return 'warning';
@@ -61,6 +78,7 @@
 
 	export function addEvent(message: string, type: EventType, zone?: string) {
 		const now = new Date();
+		const ts = Date.now() / 1000;
 		const timeStr = now.toLocaleTimeString([], {
 			hour12: false,
 			hour: '2-digit',
@@ -71,6 +89,7 @@
 		const severity = classifySeverity(type);
 		const newEvent: ActivityEvent = {
 			time: timeStr,
+			timestamp: ts,
 			message,
 			type,
 			zone,
@@ -117,6 +136,7 @@
 					minute: '2-digit',
 					second: '2-digit'
 				}),
+				timestamp: ev.timestamp,
 				message: ev.message,
 				type: ev.type,
 				zone: ev.zone,
@@ -343,7 +363,14 @@
 									{log.message}
 								</p>
 								<div class="mt-0.5 flex items-center gap-2">
-									<span class="font-mono text-[10px] text-muted-foreground">{log.time}</span>
+									<span
+									class="cursor-default font-mono text-[10px] text-muted-foreground"
+									title={log.timestamp
+										? new Date(log.timestamp * 1000).toLocaleString()
+										: log.time}
+								>
+									{log.timestamp ? relativeTime(log.timestamp) : log.time}
+								</span>
 									{#if log.zone}
 										<span
 											class="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
