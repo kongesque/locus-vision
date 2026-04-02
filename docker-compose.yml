@@ -1,0 +1,19 @@
+services:
+  locusvision:
+    build: .
+    ports:
+      - "8000:8000" # Backend API
+      - "3000:3000" # Frontend
+    volumes:
+      - locusvision-data:/app/backend/data
+    devices:
+      - /dev/video0:/dev/video0 # Webcam passthrough (remove if not needed)
+    environment:
+      - LOCUS_JWT_SECRET=change-me-use-openssl-rand-hex-32
+      - LOCUS_CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+      - ORIGIN=http://localhost:3000
+      - PORT=3000
+    restart: unless-stopped
+
+volumes:
+  locusvision-data:

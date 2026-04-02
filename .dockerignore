@@ -1,0 +1,16 @@
+node_modules
+.svelte-kit
+build
+dist
+.git
+.DS_Store
+
+# Backend runtime data (lives in Docker volume)
+backend/data/locusvision.db
+backend/data/*.duckdb
+backend/data/*.duckdb.wal
+backend/data/videos/
+backend/data/archives/
+backend/data/logs/
+backend/data/models/
+backend/.venv

@@ -23,7 +23,11 @@ class Settings(BaseSettings):
 
     # ── App ──────────────────────────────────────────────
     app_name: str = "LocusVision"
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://localhost:3000",
+    ]
 
     # ── Rate Limiting ────────────────────────────────────
     login_max_attempts: int = 5
