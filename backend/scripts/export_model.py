@@ -73,25 +73,66 @@ def main():
     
     if int8_precision and export_path and os.path.exists(export_path):
         import onnx
-        from onnxruntime.quantization import quantize_dynamic, QuantType
-        
-        print(f"Running dynamic ONNX quantization to INT8 for {export_path}...")
+        from onnxruntime.quantization import (
+            quantize_static,
+            CalibrationDataReader,
+            QuantFormat,
+            QuantType,
+        )
+
+        class _CalibReader(CalibrationDataReader):
+            def __init__(self, model_path: str, n_samples: int = 50):
+                import numpy as np
+                from onnxruntime import InferenceSession
+                sess = InferenceSession(model_path, providers=["CPUExecutionProvider"])
+                inp = sess.get_inputs()[0]
+                self._shape = inp.shape
+                self._name = inp.name
+                self._idx = 0
+                self._n = n_samples
+                h = self._shape[2] if isinstance(self._shape[2], int) else 640
+                w = self._shape[3] if isinstance(self._shape[3], int) else 640
+                self._data = [
+                    {self._name: np.random.randn(1, 3, h, w).astype(np.float32)}
+                    for _ in range(n_samples)
+                ]
+
+            def get_next(self):
+                if self._idx >= self._n:
+                    return None
+                feed = self._data[self._idx]
+                self._idx += 1
+                return feed
+
+        print(f"Running static ONNX quantization to INT8 for {export_path}...")
         try:
-            quantize_dynamic(
+            calib = _CalibReader(export_path, n_samples=50)
+            quantize_static(
                 model_input=export_path,
                 model_output=target_path,
+                calibration_data_reader=calib,
+                quant_format=QuantFormat.QDQ,
                 per_channel=True,
                 reduce_range=True,
                 weight_type=QuantType.QInt8,
             )
-            print(f"Quantization complete. Saved as {target_path}")
-            # Optionally remove the unquantized model if you only wanted int8
-            # os.remove(export_path)
-            
+            print(f"Static quantization complete. Saved as {target_path}")
         except Exception as e:
-            print(f"Quantization failed: {e}")
-            if os.path.abspath(export_path) != os.path.abspath(target_path):
-                shutil.move(export_path, target_path)
+            print(f"Static quantization failed ({e}), falling back to dynamic...")
+            from onnxruntime.quantization import quantize_dynamic
+            try:
+                quantize_dynamic(
+                    model_input=export_path,
+                    model_output=target_path,
+                    per_channel=True,
+                    reduce_range=True,
+                    weight_type=QuantType.QInt8,
+                )
+                print(f"Dynamic quantization complete. Saved as {target_path}")
+            except Exception as e2:
+                print(f"Dynamic quantization also failed: {e2}")
+                if os.path.abspath(export_path) != os.path.abspath(target_path):
+                    shutil.move(export_path, target_path)
     else:
         # Move to our models dir if needed
         if export_path and os.path.exists(export_path) and os.path.abspath(export_path) != os.path.abspath(target_path):

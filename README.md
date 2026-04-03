@@ -90,7 +90,7 @@ python backend/scripts/export_model.py yolo11n --int8
 
 ## Performance
 
-All numbers are **inference-only** (ONNX Runtime, 640×640 input, 200 iterations after warmup). End-to-end stream FPS is lower due to video decode, tracking, and analytics overhead.
+All numbers are **inference-only** (ONNX Runtime, 640×640 input, 15s timed run after 3s warmup). End-to-end stream FPS is lower due to video decode, tracking, and analytics overhead.
 
 ### High-compute reference — Apple M5 (16 GB)
 
@@ -100,17 +100,41 @@ All numbers are **inference-only** (ONNX Runtime, 640×640 input, 200 iterations
 | YOLO11s | 36 MB | **118** | 8.5 ms | 9.9 ms |
 | YOLO11m | 77 MB | **62** | 16.1 ms | 19.4 ms |
 
-> FP32, CoreML (Apple Neural Engine), ONNX Runtime 1.24.2. 15s timed run after 3s warmup, 2s cooldown between models. FPS derived from median latency. Quantized model (INT8/FP16) comparison coming with the Raspberry Pi 5 results below.
+> FP32, CoreML (Apple Neural Engine), ONNX Runtime 1.24.2. 15s timed run after 3s warmup, 2s cooldown between models. FPS derived from median latency.
 
 ### Edge reference — Raspberry Pi 5 (8 GB)
 
-> Coming soon. Run `python backend/scripts/benchmark_inference.py --markdown` on your device to generate your own numbers.
+#### CPU-only (ARM Cortex-A76)
+
+| Model | Precision | Size | FPS | Latency (median) | Latency (p99) |
+|-------|-----------|------|-----|------------------|---------------|
+| YOLO11n | FP32 | 10 MB | **5** | 188.9 ms | 275.5 ms |
+| YOLO11n | INT8 | 3 MB | **14** | 69.9 ms | 93.7 ms |
+
+> ONNX Runtime 1.24.4. Static INT8 quantization with QDQ nodes. 15s timed run after 3s warmup, 2s cooldown between models. FPS derived from median latency.
+
+#### Hailo-8L AI HAT+ (PCIe, 13 TOPS)
+
+| Model | Size | FPS | HW Latency |
+|-------|------|-----|------------|
+| YOLOv6n | 14 MB | **355** | 7.0 ms |
+| YOLOv5n-seg | 7 MB | **65** | 14.2 ms |
+| YOLOv8s | 35 MB | **59** | 13.1 ms |
+| YOLOv5s-personface | 26 MB | **64** | 13.7 ms |
+| YOLOX-s | 21 MB | **61** | 14.8 ms |
+| YOLOv8s-pose | 23 MB | **51** | 18.9 ms |
+
+> HailoRT 4.23.0, HEF format. `hailortcli benchmark`, streaming mode (includes host-side DMA transfer). 15s per model. End-to-end app FPS will be lower due to host-side preprocessing (letterbox resize, normalization) and postprocessing (NMS, tracking, zone analytics). YOLO11 HEF models not yet available — compiled from pre-built Hailo model zoo.
 
 To reproduce:
 
 ```sh
+# CPU benchmark
 cd backend && source .venv/bin/activate
 python scripts/benchmark_inference.py
+
+# Hailo benchmark
+hailortcli benchmark /usr/share/hailo-models/<model>.hef
 ```
 
 ## Contributing
