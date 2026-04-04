@@ -20,11 +20,16 @@ from services.job_queue import job_queue
 from services.metrics_collector import metrics_collector
 from services.downsampler import downsampler
 from services.archiver import archiver
+from services.model_manager import detect_backends, load_model_catalog
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database and async workers on startup."""
     await init_db()
+    
+    # Phase 0: Detect hardware and load model catalog
+    app.state.backends = detect_backends()
+    app.state.model_catalog = load_model_catalog()
     
     # Start the video processing job queue worker
     job_queue.start()
