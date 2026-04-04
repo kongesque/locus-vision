@@ -283,21 +283,47 @@ _detector_cache: dict[str, OnnxDetector] = {}
 def get_detector(model_name: str, conf_threshold: float | None = None) -> OnnxDetector:
     """
     Get or create a cached OnnxDetector for the given model name.
-    Looks for `data/models/{model_name}.onnx`.
-    When conf_threshold is specified, a separate instance is cached per threshold.
+
+    Resolution order:
+    1. Legacy exact match: `data/models/{model_name}.onnx` (backwards-compatible)
+    2. Catalog resolution: look up model_name in catalog, pick best available format
+
+    This ensures existing database rows with names like 'yolo11n_int8' still work,
+    while new simple names like 'yolo11n' resolve through the catalog.
     """
     cache_key = f"{model_name}@{conf_threshold}" if conf_threshold is not None else model_name
-    if cache_key not in _detector_cache:
-        model_path = os.path.join(MODELS_DIR, f"{model_name}.onnx")
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Model '{model_name}.onnx' not found in {MODELS_DIR}. "
-                f"Run: python scripts/export_model.py {model_name}"
-            )
-        print(f"[OnnxDetector] Loading model: {model_path} (conf={conf_threshold or 0.15})")
-        ct = conf_threshold if conf_threshold is not None else 0.15
+    if cache_key in _detector_cache:
+        return _detector_cache[cache_key]
+
+    ct = conf_threshold if conf_threshold is not None else 0.15
+
+    # Strategy 1: Legacy exact filename match (e.g. "yolo11n_int8" → yolo11n_int8.onnx)
+    exact_path = os.path.join(MODELS_DIR, f"{model_name}.onnx")
+    if os.path.exists(exact_path):
+        print(f"[OnnxDetector] Loading model (legacy): {exact_path} (conf={ct})")
+        _detector_cache[cache_key] = OnnxDetector(exact_path, conf_threshold=ct)
+        return _detector_cache[cache_key]
+
+    # Strategy 2: Catalog resolution (e.g. "yolo11n" → best available format)
+    try:
+        from services.model_manager import resolve_model, load_model_catalog, detect_backends
+        catalog = load_model_catalog()
+        backends = detect_backends()
+        resolved = resolve_model(model_name, catalog, backends)
+        model_path = resolved["path"]
+        print(f"[OnnxDetector] Loading model (catalog): {model_path} "
+              f"(format={resolved['backend']}, conf={ct})")
         _detector_cache[cache_key] = OnnxDetector(model_path, conf_threshold=ct)
-    return _detector_cache[cache_key]
+        return _detector_cache[cache_key]
+    except (ValueError, FileNotFoundError):
+        pass
+
+    # Nothing found
+    raise FileNotFoundError(
+        f"Model '{model_name}' not found. "
+        f"No exact file '{model_name}.onnx' in {MODELS_DIR} and no catalog match. "
+        f"Download models from Settings > Models."
+    )
 
 
 def list_models() -> list[str]:
@@ -308,3 +334,4 @@ def list_models() -> list[str]:
             if f.endswith(".onnx"):
                 models.append(f.replace(".onnx", ""))
     return sorted(models)
+

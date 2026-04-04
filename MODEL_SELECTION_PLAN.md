@@ -41,9 +41,9 @@ Settings > Models:
 - [x] **Phase 0C** — Model resolution (`resolve_model()`) — Ollama-style name→best-format dispatch
 - [x] **Phase 0** — Startup wiring (`main.py` lifespan stores `app.state.backends` + `app.state.model_catalog`)
 - [x] **Phase 1A** — Enriched registry endpoint (`GET /api/models/registry`) — returns backends + install status
-- [ ] **Phase 1B** — Simplified download endpoint (just `model_name`, backend auto-resolves)
-- [ ] **Phase 1C** — Delete endpoint (`DELETE /api/models/{model_name}`)
-- [ ] **Phase 1D** — Catalog-aware `get_detector()` with legacy fallback
+- [x] **Phase 1B** — Simplified download endpoint (precision optional, auto-resolves from backends)
+- [x] **Phase 1C** — Delete endpoint (`DELETE /api/models/{model_name}`) — catalog-aware + glob fallback
+- [x] **Phase 1D** — Catalog-aware `get_detector()` — legacy exact match → catalog resolution
 - [x] **Phase 2A** — Models tab added to Settings page
 - [x] **Phase 2B** — Model library component (`model-library.svelte`)
 - [x] **Phase 2C** — Settings data loader fetches model registry
@@ -55,7 +55,7 @@ Settings > Models:
 - [ ] **Phase 4C** — Camera default uses system default
 - [ ] **Phase 5A** — Create page respects system default model
 
-> **Note:** Phase 0+1A shipped together — the enriched API is live and returns detected hardware (CoreML on macOS, Hailo on Pi) alongside full catalog metadata. Phase 1B-1D deferred to after the frontend is in place so we can test the full loop. Phase 2 (Settings Model Library) built next as the primary model management UI.
+> **Note:** Phases 0–2 complete. Backend has full catalog, hardware detection, model resolution, enriched registry, simplified download, delete, and catalog-aware detector. Frontend Settings page has the Model Library tab with hardware badges, installed/available sections, download, and remove. Next up: Phase 3 (simplified create page).
 
 ---
 
@@ -65,7 +65,7 @@ The foundation. Everything else builds on this.
 
 ### 0A: Model Catalog File
 
-**New file: `backend/data/model_catalog.json`**
+**New file: `backend/model_catalog.json`**
 
 Static registry of all known models and their available formats. Ships with the app — users don't edit this. Updated when we add support for new models.
 
