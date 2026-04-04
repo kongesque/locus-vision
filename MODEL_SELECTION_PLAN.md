@@ -34,6 +34,31 @@ Settings > Models:
 
 ---
 
+## Progress
+
+- [x] **Phase 0A** — Model catalog file (`backend/data/model_catalog.json`) — 12 models, 5 YOLO families
+- [x] **Phase 0B** — Hardware detection (`detect_backends()`) — probes Hailo/CUDA/CoreML, falls back to CPU
+- [x] **Phase 0C** — Model resolution (`resolve_model()`) — Ollama-style name→best-format dispatch
+- [x] **Phase 0** — Startup wiring (`main.py` lifespan stores `app.state.backends` + `app.state.model_catalog`)
+- [x] **Phase 1A** — Enriched registry endpoint (`GET /api/models/registry`) — returns backends + install status
+- [ ] **Phase 1B** — Simplified download endpoint (just `model_name`, backend auto-resolves)
+- [ ] **Phase 1C** — Delete endpoint (`DELETE /api/models/{model_name}`)
+- [ ] **Phase 1D** — Catalog-aware `get_detector()` with legacy fallback
+- [x] **Phase 2A** — Models tab added to Settings page
+- [x] **Phase 2B** — Model library component (`model-library.svelte`)
+- [x] **Phase 2C** — Settings data loader fetches model registry
+- [ ] **Phase 3A** — Remove hardcoded models from create page
+- [ ] **Phase 3B** — Simplify tools panel to single dropdown
+- [ ] **Phase 3C** — Update form submission to send simple model name
+- [ ] **Phase 4A** — Backwards-compatible model name handling in `get_detector()`
+- [ ] **Phase 4B** — Default model setting in database
+- [ ] **Phase 4C** — Camera default uses system default
+- [ ] **Phase 5A** — Create page respects system default model
+
+> **Note:** Phase 0+1A shipped together — the enriched API is live and returns detected hardware (CoreML on macOS, Hailo on Pi) alongside full catalog metadata. Phase 1B-1D deferred to after the frontend is in place so we can test the full loop. Phase 2 (Settings Model Library) built next as the primary model management UI.
+
+---
+
 ## Phase 0: Model Catalog & Hardware Detection
 
 The foundation. Everything else builds on this.

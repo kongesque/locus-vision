@@ -1,0 +1,127 @@
+{
+  "models": {
+    "yolo11n": {
+      "label": "YOLO11 Nano",
+      "family": "yolo11",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolo11n.onnx", "size_mb": 10.2 },
+        "onnx_fp16": { "file": "yolo11n_half.onnx", "size_mb": 5.1 },
+        "onnx_int8": { "file": "yolo11n_int8.onnx", "size_mb": 2.7 }
+      }
+    },
+    "yolo11s": {
+      "label": "YOLO11 Small",
+      "family": "yolo11",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolo11s.onnx", "size_mb": 37.2 },
+        "onnx_fp16": { "file": "yolo11s_half.onnx", "size_mb": 18.6 },
+        "onnx_int8": { "file": "yolo11s_int8.onnx", "size_mb": 9.5 }
+      }
+    },
+    "yolo11m": {
+      "label": "YOLO11 Medium",
+      "family": "yolo11",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolo11m.onnx", "size_mb": 77.0 },
+        "onnx_fp16": { "file": "yolo11m_half.onnx", "size_mb": 38.5 },
+        "onnx_int8": { "file": "yolo11m_int8.onnx", "size_mb": 19.8 }
+      }
+    },
+    "yolo11l": {
+      "label": "YOLO11 Large",
+      "family": "yolo11",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolo11l.onnx", "size_mb": 99.0 },
+        "onnx_fp16": { "file": "yolo11l_half.onnx", "size_mb": 49.5 },
+        "onnx_int8": { "file": "yolo11l_int8.onnx", "size_mb": 25.3 }
+      }
+    },
+    "yolo11x": {
+      "label": "YOLO11 Extra Large",
+      "family": "yolo11",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolo11x.onnx", "size_mb": 224.0 },
+        "onnx_fp16": { "file": "yolo11x_half.onnx", "size_mb": 112.0 },
+        "onnx_int8": { "file": "yolo11x_int8.onnx", "size_mb": 57.3 }
+      }
+    },
+    "yolov8n": {
+      "label": "YOLOv8 Nano",
+      "family": "yolov8",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolov8n.onnx", "size_mb": 12.2 },
+        "onnx_int8": { "file": "yolov8n_int8.onnx", "size_mb": 3.4 },
+        "hailo": { "file": "yolov8n_h8l.hef", "size_mb": 7.0 }
+      }
+    },
+    "yolov8s": {
+      "label": "YOLOv8 Small",
+      "family": "yolov8",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "onnx_fp32": { "file": "yolov8s.onnx", "size_mb": 44.8 },
+        "onnx_int8": { "file": "yolov8s_int8.onnx", "size_mb": 11.5 },
+        "hailo": { "file": "yolov8s_h8l.hef", "size_mb": 35.0, "fps_estimate": 59 }
+      }
+    },
+    "yolov8s-pose": {
+      "label": "YOLOv8 Small Pose",
+      "family": "yolov8",
+      "purpose": "pose",
+      "classes": "coco-keypoints",
+      "formats": {
+        "hailo": { "file": "yolov8s_pose_h8l_pi.hef", "size_mb": 23.0, "fps_estimate": 51 }
+      }
+    },
+    "yolov6n": {
+      "label": "YOLOv6 Nano",
+      "family": "yolov6",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "hailo": { "file": "yolov6n_h8l.hef", "size_mb": 14.0, "fps_estimate": 355 }
+      }
+    },
+    "yolov5n-seg": {
+      "label": "YOLOv5 Nano Segmentation",
+      "family": "yolov5",
+      "purpose": "segmentation",
+      "classes": "coco80",
+      "formats": {
+        "hailo": { "file": "yolov5n_seg_h8l_mz.hef", "size_mb": 7.0, "fps_estimate": 65 }
+      }
+    },
+    "yolov5s-personface": {
+      "label": "YOLOv5 Small Person+Face",
+      "family": "yolov5",
+      "purpose": "person-face",
+      "classes": ["person", "face"],
+      "formats": {
+        "hailo": { "file": "yolov5s_personface_h8l.hef", "size_mb": 26.0, "fps_estimate": 64 }
+      }
+    },
+    "yolox-s": {
+      "label": "YOLOX Small",
+      "family": "yolox",
+      "purpose": "detection",
+      "classes": "coco80",
+      "formats": {
+        "hailo": { "file": "yolox_s_leaky_h8l_mz.hef", "size_mb": 21.0, "fps_estimate": 61 }
+      }
+    }
+  },
+  "format_priority": ["hailo", "onnx_int8", "onnx_fp16", "onnx_fp32"]
+}

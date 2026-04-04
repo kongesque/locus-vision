@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # ── Paths ────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CATALOG_PATH = os.path.join(BASE_DIR, "data", "model_catalog.json")
+CATALOG_PATH = os.path.join(BASE_DIR, "model_catalog.json")
 
 
 # ── 0A: Model Catalog ───────────────────────────────────────────

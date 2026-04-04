@@ -13,6 +13,17 @@ export const load: PageServerLoad = async ({ cookies, locals }) => {
 
     let users: any[] = [];
     let appSettings = { allow_signup: false };
+    let modelRegistry = { backends: [], models: [] };
+
+    // Fetch model registry (available to all users)
+    try {
+        const modelsRes = await fetch(`${API_BASE}/api/models/registry`);
+        if (modelsRes.ok) {
+            modelRegistry = await modelsRes.json();
+        }
+    } catch {
+        // Backend might not be running — graceful fallback
+    }
 
     if (isAdmin) {
         // Fetch all users
@@ -35,7 +46,8 @@ export const load: PageServerLoad = async ({ cookies, locals }) => {
     return {
         user: locals.user,
         users,
-        appSettings
+        appSettings,
+        modelRegistry
     };
 };
 

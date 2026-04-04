@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import PageTitle2 from '$lib/components/page-title-2.svelte';
+	import ModelLibrary from '$lib/components/settings/model-library.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -10,7 +11,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { User, Shield, Palette, Users, Database, LogOut, AlertTriangle } from '@lucide/svelte';
+	import { User, Shield, Palette, Users, Database, LogOut, AlertTriangle, Box } from '@lucide/svelte';
 	import { setMode, resetMode } from 'mode-watcher';
 
 	let { data, form }: { data: any; form: any } = $props();
@@ -22,13 +23,15 @@
 	const userTabs = [
 		{ id: 'profile', label: 'Profile', icon: User },
 		{ id: 'security', label: 'Security', icon: Shield },
-		{ id: 'appearance', label: 'Appearance', icon: Palette }
+		{ id: 'appearance', label: 'Appearance', icon: Palette },
+		{ id: 'models', label: 'Models', icon: Box }
 	];
 
 	const adminTabs = [
 		{ id: 'profile', label: 'Profile', icon: User },
 		{ id: 'security', label: 'Security', icon: Shield },
 		{ id: 'appearance', label: 'Appearance', icon: Palette },
+		{ id: 'models', label: 'Models', icon: Box },
 		{ id: 'admin', label: 'Admin', icon: Users }
 	];
 
@@ -314,6 +317,14 @@
 				</div>
 			</Card.Content>
 		</Card.Root>
+	{/if}
+
+	<!-- MODELS TAB -->
+	{#if activeTab === 'models'}
+		<ModelLibrary
+			backends={data.modelRegistry?.backends ?? []}
+			models={data.modelRegistry?.models ?? []}
+		/>
 	{/if}
 
 	<!-- ADMIN TAB -->
