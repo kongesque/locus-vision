@@ -11,11 +11,13 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import { User, Shield, Palette, Users, Database, LogOut, AlertTriangle, Box } from '@lucide/svelte';
 	import { setMode, resetMode } from 'mode-watcher';
 
 	let { data, form }: { data: any; form: any } = $props();
 	let loading = $state('');
+	let defaultModelForm = $state<HTMLFormElement>();
 
 	// Tab navigation
 	let activeTab = $state('profile');
@@ -378,6 +380,7 @@
 
 				<!-- Default Model Selector -->
 				<form
+					bind:this={defaultModelForm}
 					method="POST"
 					action="?/setDefaultModel"
 					use:enhance={() => {
@@ -398,19 +401,27 @@
 							</p>
 						</div>
 						<div class="flex items-center gap-2">
-							<select
-								id="default_model_select"
+							<Select.Root
+								type="single"
 								name="default_model"
-								class="h-9 rounded-md border bg-background px-3 text-sm"
 								value={data.appSettings?.default_model ?? 'yolo11n'}
-								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								onValueChange={() => {
+									// Small timeout to let the value update in the DOM for the form submission
+									setTimeout(() => defaultModelForm?.requestSubmit(), 0);
+								}}
 							>
-								{#each data.modelRegistry?.models ?? [] as model (model.name)}
-									<option value={model.name}>
-										{model.label}
-									</option>
-								{/each}
-							</select>
+								<Select.Trigger class="w-[200px]">
+									{data.modelRegistry?.models?.find(
+										(m: { name: string; label: string }) =>
+											m.name === (data.appSettings?.default_model ?? 'yolo11n')
+									)?.label ?? 'Select model'}
+								</Select.Trigger>
+								<Select.Content>
+									{#each data.modelRegistry?.models ?? [] as model (model.name)}
+										<Select.Item value={model.name} label={model.label} />
+									{/each}
+								</Select.Content>
+							</Select.Root>
 						</div>
 					</div>
 				</form>
