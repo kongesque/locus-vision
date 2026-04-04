@@ -95,6 +95,7 @@ class RoleUpdate(BaseModel):
 
 class AppSettingsUpdate(BaseModel):
     allow_signup: bool | None = None
+    default_model: str | None = None
 
 
 # ── Response Models ──────────────────────────────────────
@@ -124,6 +125,7 @@ class MessageResponse(BaseModel):
 
 class AppSettingsResponse(BaseModel):
     allow_signup: bool
+    default_model: str = "yolo11n"
 
 
 

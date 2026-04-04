@@ -51,6 +51,7 @@ async def init_db():
 
             -- Default app settings
             INSERT OR IGNORE INTO app_settings (key, value) VALUES ('allow_signup', 'false');
+            INSERT OR IGNORE INTO app_settings (key, value) VALUES ('default_model', 'yolo11n');
 
             CREATE TABLE IF NOT EXISTS video_tasks (
                 id            TEXT    PRIMARY KEY,

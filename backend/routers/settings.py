@@ -333,7 +333,11 @@ async def delete_user(
 async def get_app_settings(admin: dict = Depends(_require_admin)):
     """Get app-level settings (admin only)."""
     allow_signup = await get_app_setting("allow_signup", "false")
-    return AppSettingsResponse(allow_signup=allow_signup == "true")
+    default_model = await get_app_setting("default_model", "yolo11n")
+    return AppSettingsResponse(
+        allow_signup=allow_signup == "true",
+        default_model=default_model,
+    )
 
 
 @router.put("/api/admin/app-settings", response_model=AppSettingsResponse)
@@ -344,9 +348,15 @@ async def update_app_settings(
     """Update app-level settings (admin only)."""
     if data.allow_signup is not None:
         await set_app_setting("allow_signup", "true" if data.allow_signup else "false")
+    if data.default_model is not None:
+        await set_app_setting("default_model", data.default_model)
 
     allow_signup = await get_app_setting("allow_signup", "false")
-    return AppSettingsResponse(allow_signup=allow_signup == "true")
+    default_model = await get_app_setting("default_model", "yolo11n")
+    return AppSettingsResponse(
+        allow_signup=allow_signup == "true",
+        default_model=default_model,
+    )
 
 @router.delete("/api/admin/media", response_model=MessageResponse)
 async def delete_all_media(admin: dict = Depends(_require_admin)):

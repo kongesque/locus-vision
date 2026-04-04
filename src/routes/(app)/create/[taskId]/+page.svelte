@@ -54,8 +54,10 @@
 			if (res.ok) {
 				const data = await res.json();
 				installedModels = (data.models ?? []).filter((m: any) => m.installed);
-				// Default to yolo11n if available, otherwise first installed model
+				// Use system default model, fall back to yolo11n, then first installed
+				const systemDefault = data.default_model || 'yolo11n';
 				selectedModel =
+					installedModels.find((m) => m.name === systemDefault)?.name ||
 					installedModels.find((m) => m.name === 'yolo11n')?.name ||
 					installedModels[0]?.name ||
 					'';

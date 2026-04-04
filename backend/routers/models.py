@@ -6,6 +6,7 @@ from typing import Any
 
 from services.model_manager import model_manager, get_installed_models, resolve_model, load_model_catalog
 from services.onnx_detector import list_models, MODELS_DIR
+from database import get_app_setting
 
 router = APIRouter(prefix="/api/models", tags=["Models"])
 
@@ -29,10 +30,11 @@ async def get_model_registry(request: Request):
 
     # Fallback: catalog not loaded — return legacy format
     if catalog is None or backends is None:
-        return {"backends": [], "models": [], "legacy": list_models()}
+        return {"backends": [], "models": [], "default_model": "yolo11n", "legacy": list_models()}
 
     models = get_installed_models(catalog, backends)
-    return {"backends": backends, "models": models}
+    default_model = await get_app_setting("default_model", "yolo11n")
+    return {"backends": backends, "models": models, "default_model": default_model}
 
 
 @router.get("/registry/legacy")

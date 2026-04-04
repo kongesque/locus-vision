@@ -376,6 +376,45 @@
 					</div>
 				</form>
 
+				<!-- Default Model Selector -->
+				<form
+					method="POST"
+					action="?/setDefaultModel"
+					use:enhance={() => {
+						loading = 'defaultModel';
+						return async ({ update }) => {
+							loading = '';
+							await update();
+						};
+					}}
+				>
+					<div class="mt-4 flex items-center justify-between rounded-lg border p-4">
+						<div class="space-y-0.5">
+							<Label for="default_model_select" class="text-sm font-medium">
+								Default Model
+							</Label>
+							<p class="text-sm text-muted-foreground">
+								Model pre-selected when creating new tasks
+							</p>
+						</div>
+						<div class="flex items-center gap-2">
+							<select
+								id="default_model_select"
+								name="default_model"
+								class="h-9 rounded-md border bg-background px-3 text-sm"
+								value={data.appSettings?.default_model ?? 'yolo11n'}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							>
+								{#each data.modelRegistry?.models ?? [] as model (model.name)}
+									<option value={model.name}>
+										{model.label}
+									</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+				</form>
+
 				{#if form?.settingsSuccess}
 					<p class="mt-2 text-sm text-green-600">Settings updated</p>
 				{/if}

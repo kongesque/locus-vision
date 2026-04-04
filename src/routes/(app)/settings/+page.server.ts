@@ -201,6 +201,28 @@ export const actions: Actions = {
         return { settingsSuccess: true };
     },
 
+    setDefaultModel: async ({ request, cookies }) => {
+        const data = await request.formData();
+        const defaultModel = data.get('default_model') as string;
+        const accessToken = cookies.get('access_token');
+
+        const res = await fetch(`${API_BASE}/api/admin/app-settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ default_model: defaultModel })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            return fail(res.status, { adminError: err.detail || 'Failed to update default model' });
+        }
+
+        return { settingsSuccess: true };
+    },
+
     deleteAllMedia: async ({ cookies }) => {
         const accessToken = cookies.get('access_token');
 

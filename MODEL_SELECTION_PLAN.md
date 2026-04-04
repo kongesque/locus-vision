@@ -50,12 +50,12 @@ Settings > Models:
 - [x] **Phase 3A** — Removed hardcoded YOLO11_MODELS, precision state, download handlers from create page
 - [x] **Phase 3B** — Simplified tools panel: single dropdown of installed models, no precision/download UI
 - [x] **Phase 3C** — Form submission sends simple model name (backend resolves)
-- [ ] **Phase 4A** — Backwards-compatible model name handling in `get_detector()`
-- [ ] **Phase 4B** — Default model setting in database
-- [ ] **Phase 4C** — Camera default uses system default
-- [ ] **Phase 5A** — Create page respects system default model
+- [x] **Phase 4A** — Backwards-compatible model name handling in `get_detector()` (done in 1D)
+- [x] **Phase 4B** — Default model setting in database (`app_settings.default_model`)
+- [x] **Phase 4C** — Camera default uses system default (admin UI selector in Settings)
+- [x] **Phase 5A** — Create page respects system default model (from registry API)
 
-> **Note:** Phases 0–2 complete. Backend has full catalog, hardware detection, model resolution, enriched registry, simplified download, delete, and catalog-aware detector. Frontend Settings page has the Model Library tab with hardware badges, installed/available sections, download, and remove. Next up: Phase 3 (simplified create page).
+> **Note:** All phases complete. The model selection system is fully implemented — catalog, hardware detection, resolution, enriched registry, download/delete endpoints, catalog-aware detector, Model Library UI, simplified Create page (single dropdown, no precision picker), system-wide default model setting with admin UI, and Create page auto-selection from system default.
 
 ---
 
