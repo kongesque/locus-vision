@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && apt-get purge -y curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -57,7 +56,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
 # Start both processes — exit container if either dies
-CMD ["sh", "-c", "\
+CMD ["bash", "-c", "\
     cd /app/backend && uvicorn main:app --host 0.0.0.0 --port 8000 & \
     PID_BACKEND=$! && \
     cd /app && PORT=3000 ORIGIN=http://localhost:3000 node build & \
