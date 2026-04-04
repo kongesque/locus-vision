@@ -8,7 +8,6 @@
 	import ToolsPanel from '$lib/components/create/tools-panel.svelte';
 	import type { Point, Zone } from '$lib/components/create/drawing-canvas.svelte';
 	import { onMount } from 'svelte';
-	import { API_URL } from '$lib/api';
 
 	import { videoStore } from '$lib/stores/video.svelte';
 

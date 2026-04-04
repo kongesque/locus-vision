@@ -7,7 +7,6 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Plus, Loader2, RefreshCw, Camera, Globe } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
-	import { API_URL } from '$lib/api';
 	import { videoStore } from '$lib/stores/video.svelte';
 
 	import { untrack } from 'svelte';

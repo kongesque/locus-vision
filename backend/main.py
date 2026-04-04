@@ -54,9 +54,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# CORS — accept any origin so the app works on any host (LAN, Tailscale, etc.)
-# allow_origin_regex=".*" echoes back the exact Origin header, which is required
-# when allow_credentials=True (wildcard "*" is not valid with credentials).
+# CORS — only needed if accessing FastAPI directly (SvelteKit proxies bypass this)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
