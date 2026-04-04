@@ -220,7 +220,7 @@
 		<!-- ═══════════════════════════════════════════════════ -->
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
 			<!-- CPU -->
-			<a href="/system" class="group">
+			<a href="/system" class="group cursor-pointer">
 				<Card.Root
 					class="relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg {getStatusGlow(
 						stats.system.cpu_percent
@@ -248,7 +248,7 @@
 			</a>
 
 			<!-- Memory -->
-			<a href="/system" class="group">
+			<a href="/system" class="group cursor-pointer">
 				<Card.Root
 					class="relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg {getStatusGlow(
 						stats.system.memory_percent
@@ -280,7 +280,7 @@
 			</a>
 
 			<!-- Storage -->
-			<a href="/system" class="group">
+			<a href="/system" class="group cursor-pointer">
 				<Card.Root
 					class="relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg {getStatusGlow(
 						stats.storage?.total?.percent || 0
@@ -314,7 +314,7 @@
 			</a>
 
 			<!-- Detector / Inference -->
-			<a href="/system" class="group">
+			<a href="/system" class="group cursor-pointer">
 				<Card.Root
 					class="relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
 				>
@@ -352,7 +352,7 @@
 		<!-- ═══════════════════════════════════════════════════ -->
 		<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 			<!-- Live Cameras Card -->
-			<a href="/livestream" class="group">
+			<a href="/livestream" class="group cursor-pointer">
 				<Card.Root
 					class="flex h-full flex-col transition-all duration-300 hover:scale-[1.01] hover:shadow-lg"
 				>
@@ -402,7 +402,7 @@
 			</a>
 
 			<!-- Video Analytics Queue Card -->
-			<a href="/video-analytics" class="group">
+			<a href="/video-analytics" class="group cursor-pointer">
 				<Card.Root
 					class="flex h-full flex-col transition-all duration-300 hover:scale-[1.01] hover:shadow-lg"
 				>
@@ -463,23 +463,23 @@
 					</div>
 				</Card.Header>
 				<Card.Content class="flex flex-1 flex-col gap-2">
-					<Button variant="outline" class="w-full justify-start gap-2" onclick={openAddCameraDialog}>
+					<Button variant="outline" class="w-full justify-start gap-2 cursor-pointer" onclick={openAddCameraDialog}>
 						<Plus class="h-4 w-4" />
 						New Camera Stream
 					</Button>
-					<a href="/video-analytics" class="w-full">
+					<a href="/video-analytics" class="w-full cursor-pointer">
 						<Button variant="outline" class="w-full justify-start gap-2">
 							<Upload class="h-4 w-4" />
 							Upload Video
 						</Button>
 					</a>
-					<a href="/analytics" class="w-full">
+					<a href="/analytics" class="w-full cursor-pointer">
 						<Button variant="outline" class="w-full justify-start gap-2">
 							<Activity class="h-4 w-4" />
 							View Historical Analytics
 						</Button>
 					</a>
-					<a href="/system" class="w-full">
+					<a href="/system" class="w-full cursor-pointer">
 						<Button variant="outline" class="w-full justify-start gap-2">
 							<Server class="h-4 w-4" />
 							System Monitor
@@ -504,7 +504,7 @@
 					</div>
 				</div>
 				<a href="/video-analytics">
-					<Button variant="ghost" size="sm" class="gap-1 text-xs text-muted-foreground">
+					<Button variant="ghost" size="sm" class="gap-1 text-xs text-muted-foreground cursor-pointer">
 						View all
 						<ArrowRight class="h-3 w-3" />
 					</Button>
@@ -517,7 +517,7 @@
 							{@const StatusIcon = taskStatusIcon(task.status)}
 							<a
 								href="/video-analytics/{task.id}"
-								class="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
+								class="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50 cursor-pointer"
 							>
 								<StatusIcon class="h-4 w-4 shrink-0 {taskStatusColor(task.status)}" />
 								<div class="flex min-w-0 flex-1 items-center justify-between gap-2">

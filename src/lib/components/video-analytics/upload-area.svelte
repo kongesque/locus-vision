@@ -166,7 +166,7 @@
 			<Button
 				variant="ghost"
 				size="icon"
-				class="h-10 w-10 rounded-full text-muted-foreground hover:text-foreground"
+				class="h-10 w-10 rounded-full cursor-pointer text-muted-foreground hover:text-foreground"
 				onclick={handleUploadClick}
 			>
 				<Upload class="h-5 w-5" />

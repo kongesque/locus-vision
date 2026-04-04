@@ -141,8 +141,8 @@
 			<div class="text-sm text-red-600">{deleteError}</div>
 		{/if}
 		<Dialog.Footer class="gap-2 sm:justify-end">
-			<Button variant="outline" onclick={() => (isDeleteDialogOpen = false)}>Cancel</Button>
-			<Button variant="destructive" onclick={deleteTask} disabled={isDeleting}>
+			<Button variant="outline" onclick={() => (isDeleteDialogOpen = false)} class="cursor-pointer">Cancel</Button>
+			<Button variant="destructive" onclick={deleteTask} disabled={isDeleting} class="cursor-pointer">
 				{#if isDeleting}
 					<Loader2 class="mr-2 size-4 animate-spin" />
 					Deleting...

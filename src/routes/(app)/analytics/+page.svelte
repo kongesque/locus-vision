@@ -12,6 +12,7 @@
 		Clock,
 		TrendingUp
 	} from '@lucide/svelte';
+	import UploadArea from '$lib/components/video-analytics/upload-area.svelte';
 	import type { PageData } from './$types';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -192,7 +193,7 @@
 				onValueChange={() => loadAnalytics()}
 				disabled={data.cameras?.length === 0}
 			>
-				<Select.Trigger class="w-[200px]">
+				<Select.Trigger class="w-[200px] cursor-pointer">
 					{data.cameras?.find((c: { id: string; name?: string }) => c.id === selectedCamera)?.name || selectedCamera || 'Select camera'}
 				</Select.Trigger>
 				<Select.Content>
@@ -206,7 +207,7 @@
 			</Select.Root>
 
 			<Select.Root type="single" bind:value={timeRange} onValueChange={() => loadAnalytics()}>
-				<Select.Trigger class="w-[140px]">
+				<Select.Trigger class="w-[140px] cursor-pointer">
 					{{ '24h': 'Last 24 Hours', '7d': 'Last 7 Days', '30d': 'Last 30 Days' }[timeRange]}
 				</Select.Trigger>
 				<Select.Content>
@@ -219,24 +220,29 @@
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger
 					disabled={!selectedCamera || isLoading}
-					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium whitespace-nowrap text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium whitespace-nowrap text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
 				>
 					<Download class="h-4 w-4" />
 					Export
 					<ChevronDown class="h-3 w-3 opacity-70" />
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="end" class="w-40">
-					<DropdownMenu.Item onclick={() => handleDownload('csv')} class="gap-2">
+					<DropdownMenu.Item onclick={() => handleDownload('csv')} class="gap-2 cursor-pointer">
 						<Download class="size-3.5" />
 						Export as CSV
 					</DropdownMenu.Item>
-					<DropdownMenu.Item onclick={() => handleDownload('json')} class="gap-2">
+					<DropdownMenu.Item onclick={() => handleDownload('json')} class="gap-2 cursor-pointer">
 						<Download class="size-3.5" />
 						Export as JSON
 					</DropdownMenu.Item>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		</div>
+	</div>
+
+	<!-- Quick Upload -->
+	<div class="mb-2">
+		<UploadArea />
 	</div>
 
 	{#if isLoading}

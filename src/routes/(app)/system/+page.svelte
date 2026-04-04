@@ -261,15 +261,15 @@
 		<!-- Frigate-style Tabs -->
 		<Tabs bind:value={activeTab} class="w-full">
 			<TabsList class="grid w-full grid-cols-3 lg:w-[400px]">
-				<TabsTrigger value="cameras">
+				<TabsTrigger value="cameras" class="cursor-pointer">
 					<Camera class="mr-2 h-4 w-4" />
 					Cameras
 				</TabsTrigger>
-				<TabsTrigger value="processes">
+				<TabsTrigger value="processes" class="cursor-pointer">
 					<Cpu class="mr-2 h-4 w-4" />
 					Processes
 				</TabsTrigger>
-				<TabsTrigger value="storage">
+				<TabsTrigger value="storage" class="cursor-pointer">
 					<Database class="mr-2 h-4 w-4" />
 					Storage
 				</TabsTrigger>
@@ -513,7 +513,7 @@
 					<a
 						href={`${API_URL}/api/metrics`}
 						target="_blank"
-						class="text-primary hover:underline"
+						class="text-primary hover:underline cursor-pointer"
 					>
 						View raw metrics
 					</a>
