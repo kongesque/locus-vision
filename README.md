@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 - 🎞️ **Video Processing** — Upload videos for batch analysis with a crash-resilient background job queue
 - 📊 **Analytics & Export** — Peak hours analysis, hourly aggregations, CSV/JSON export, Prometheus-compatible metrics
 - 📷 **Camera Management** — ONVIF auto-discovery, RTSP streams, USB webcams, V4L2 hardware decoding
-- 🧠 **Model Flexibility** — Hot-swap YOLO models from the UI, INT8/FP16 quantization, drag-and-drop `.onnx` import
+- 🧠 **Model Flexibility** — Pick a model by name and the system auto-detects your hardware (Hailo, CUDA, CoreML, CPU) to select the best execution path. Browse, download, and remove models from Settings.
 - 🔒 **Auth & Security** — JWT with rate-limited login, role-based access, session management
 - 📈 **System Monitor** — Per-camera FPS breakdown, CPU/memory/storage dashboard, Parquet archival of old data
 
@@ -49,7 +49,7 @@ https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 | Styling | Tailwind CSS 4, shadcn-svelte |
 | Backend | FastAPI, Python 3.11+ |
 | Database | SQLite (async), DuckDB (analytics) |
-| AI / Vision | ONNX Runtime, YOLO11n, ByteTrack, OpenCV |
+| AI / Vision | ONNX Runtime, YOLO (v5–v11), ByteTrack, OpenCV, Hailo-8L |
 | Auth | JWT + Argon2id |
 
 ## Quick Start
@@ -81,7 +81,7 @@ pnpm dev
 
 Open [localhost:5173](http://localhost:5173) (app) or [localhost:8000/api/docs](http://localhost:8000/api/docs) (API docs).
 
-**Optional** — generate an INT8 quantized model for edge deployment:
+Models are managed from **Settings > Models** in the UI. The system auto-detects your hardware and downloads the optimal format. To manually export a quantized model instead:
 
 ```sh
 source backend/.venv/bin/activate
