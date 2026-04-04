@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { API_URL } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
@@ -70,7 +71,7 @@
 	// Fetch camera details from backend
 	async function fetchCameraInfo() {
 		try {
-			const res = await fetch(`http://localhost:8000/api/cameras/${taskId}`);
+			const res = await fetch(`${API_URL}/api/cameras/${taskId}`);
 			if (res.ok) {
 				const data = await res.json();
 				cameraName = data.name;
@@ -118,7 +119,7 @@
 	async function saveSettings() {
 		try {
 			isSaving = true;
-			const res = await fetch(`http://localhost:8000/api/cameras/${taskId}`, {
+			const res = await fetch(`${API_URL}/api/cameras/${taskId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -143,7 +144,7 @@
 	async function deleteCamera() {
 		try {
 			isDeleting = true;
-			const res = await fetch(`http://localhost:8000/api/cameras/${taskId}`, {
+			const res = await fetch(`${API_URL}/api/cameras/${taskId}`, {
 				method: 'DELETE'
 			});
 			if (res.ok) {
@@ -214,7 +215,7 @@
 	$effect(() => {
 		// Only run in the browser
 		if (typeof window !== 'undefined') {
-			eventSource = new EventSource(`http://localhost:8000/api/livestream/${taskId}/events`);
+			eventSource = new EventSource(`${API_URL}/api/livestream/${taskId}/events`);
 
 			eventSource.onopen = () => {
 				isConnected = true;
@@ -305,7 +306,7 @@
 	// ─── Fetch initial state from server (NVR-style persistence) ───
 	async function fetchStreamStatus() {
 		try {
-			const res = await fetch(`http://localhost:8000/api/livestream/${taskId}/status`);
+			const res = await fetch(`${API_URL}/api/livestream/${taskId}/status`);
 			if (res.ok) {
 				const data = await res.json();
 				if (data.started_at) {
@@ -330,7 +331,7 @@
 
 	async function fetchFpsNow() {
 		try {
-			const res = await fetch('http://localhost:8000/api/system/cameras');
+			const res = await fetch(`${API_URL}/api/system/cameras`);
 			if (res.ok) {
 				const data = await res.json();
 				if (data.cameras) {
@@ -348,7 +349,7 @@
 	async function fetchRecentEvents() {
 		try {
 			const res = await fetch(
-				`http://localhost:8000/api/livestream/${taskId}/recent-events?limit=100`
+				`${API_URL}/api/livestream/${taskId}/recent-events?limit=100`
 			);
 			if (res.ok) {
 				const data = await res.json();
@@ -369,7 +370,7 @@
 		fetchCameraInfo();
 
 		// Fetch storage once on mount
-		fetch('http://localhost:8000/api/system/storage')
+		fetch(`${API_URL}/api/system/storage`)
 			.then((res) => res.json())
 			.then((data) => {
 				if (data.total) {
@@ -524,7 +525,7 @@
 					>
 						{#if isConnected}
 							<img
-								src={`http://localhost:8000/api/livestream/${taskId}/video`}
+								src={`${API_URL}/api/livestream/${taskId}/video`}
 								alt="Live Video Feed"
 								class="h-full w-full object-contain"
 								bind:naturalWidth={videoWidth}

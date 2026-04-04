@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import { API_URL } from '$lib/api';
 	import { fade } from 'svelte/transition';
 	import EchoLoader from '$lib/components/echo-loader.svelte';
 	import { CircleAlert } from '@lucide/svelte';
@@ -88,7 +89,7 @@
 		class="relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 group-hover:rounded-none"
 	>
 		<img
-			src={`http://localhost:8000/api/livestream/${cameraId}/video`}
+			src={`${API_URL}/api/livestream/${cameraId}/video`}
 			alt={title}
 			class="aspect-video w-full object-cover transition-opacity duration-300 group-hover:opacity-80"
 		/>

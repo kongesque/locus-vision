@@ -7,6 +7,7 @@
 	import ToolsPanel from '$lib/components/create/tools-panel.svelte';
 	import type { Point, Zone } from '$lib/components/create/drawing-canvas.svelte';
 	import { onMount } from 'svelte';
+	import { API_URL } from '$lib/api';
 
 	import { videoStore } from '$lib/stores/video.svelte';
 
@@ -73,7 +74,7 @@
 
 	async function fetchDownloadedModels() {
 		try {
-			const res = await fetch('http://localhost:8000/api/models/registry');
+			const res = await fetch(`${API_URL}/api/models/registry`);
 			if (res.ok) {
 				downloadedModels = await res.json();
 			}
@@ -84,7 +85,7 @@
 
 	async function handleDownloadModel() {
 		try {
-			const res = await fetch('http://localhost:8000/api/models/download', {
+			const res = await fetch(`${API_URL}/api/models/download`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -106,7 +107,7 @@
 		if (!isDownloadingModel) return;
 
 		try {
-			const res = await fetch('http://localhost:8000/api/models/download/status');
+			const res = await fetch(`${API_URL}/api/models/download/status`);
 			if (res.ok) {
 				const statuses = await res.json();
 				// The backend key is baseModel_precision e.g. "yolo11s_int8"
@@ -206,7 +207,7 @@
 			formData.append('confidence_threshold', String(confidenceThreshold));
 
 			// Fire-and-forget: upload in background
-			fetch(`http://localhost:8000/api/video/${taskId}/process`, {
+			fetch(`${API_URL}/api/video/${taskId}/process`, {
 				method: 'POST',
 				body: formData
 			}).catch((err) => console.error('Upload failed:', err));
@@ -230,7 +231,7 @@
 					new Set([...finalGlobalClasses, ...finalZones.flatMap((z) => z.classes || [])])
 				);
 
-				const response = await fetch(`http://localhost:8000/api/cameras/${taskId}`, {
+				const response = await fetch(`${API_URL}/api/cameras/${taskId}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({

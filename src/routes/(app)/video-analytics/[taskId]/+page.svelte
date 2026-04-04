@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { API_URL } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
@@ -86,7 +87,7 @@
 		if (task) {
 			if (task.status === 'completed') {
 				status = 'ready';
-				videoSrc = `http://localhost:8000/api/video/${taskId}/result`;
+				videoSrc = `${API_URL}/api/video/${taskId}/result`;
 			} else if (task.status === 'failed') {
 				status = 'error';
 			} else {
@@ -120,7 +121,7 @@
 
 	async function fetchTimelineData() {
 		try {
-			const res = await fetch(`http://localhost:8000/api/video/${taskId}/data`);
+			const res = await fetch(`${API_URL}/api/video/${taskId}/data`);
 			if (!res.ok) return;
 			const json = await res.json();
 			if (json.frames && Array.isArray(json.frames)) {
@@ -350,7 +351,7 @@
 	async function deleteTask() {
 		try {
 			isDeleting = true;
-			const res = await fetch(`http://localhost:8000/api/video/${taskId}`, {
+			const res = await fetch(`${API_URL}/api/video/${taskId}`, {
 				method: 'DELETE'
 			});
 			if (res.ok) {
@@ -371,7 +372,7 @@
 	async function saveSettings() {
 		try {
 			isSaving = true;
-			const res = await fetch(`http://localhost:8000/api/video/${taskId}`, {
+			const res = await fetch(`${API_URL}/api/video/${taskId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -398,11 +399,11 @@
 	async function checkStatus() {
 		if (status === 'ready') return;
 		try {
-			const res = await fetch(`http://localhost:8000/api/video/${taskId}/status`);
+			const res = await fetch(`${API_URL}/api/video/${taskId}/status`);
 			if (res.ok) {
 				const data = await res.json();
 				if (data.status === 'completed') {
-					videoSrc = `http://localhost:8000/api/video/${taskId}/result`;
+					videoSrc = `${API_URL}/api/video/${taskId}/result`;
 					status = 'ready';
 					taskProgress = 100;
 					stopPolling();
@@ -584,7 +585,7 @@
 					variant="outline"
 					size="sm"
 					class="gap-1.5"
-					href={`http://localhost:8000/api/video/${taskId}/data`}
+					href={`${API_URL}/api/video/${taskId}/data`}
 					download
 				>
 					<FileJson class="size-3.5" />

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DrawingCanvas, { type Point, type Zone } from './drawing-canvas.svelte';
 	import { onMount } from 'svelte';
+	import { API_URL } from '$lib/api';
 	import Hls from 'hls.js';
 
 	interface Props {
@@ -113,7 +114,7 @@
 			// The backend proxy `/api/cameras/hls-proxy` was removed.
 			//
 			// Previous behavior:
-			// const proxyUrl = `http://localhost:8000/api/cameras/hls-proxy?url=${encodeURIComponent(url)}`;
+			// const proxyUrl = `${API_URL}/api/cameras/hls-proxy?url=${encodeURIComponent(url)}`;
 			const proxyUrl = '';
 
 			if (Hls.isSupported()) {
@@ -220,7 +221,7 @@
 			<!-- Raw MJPEG preview stream — no inference, dimensions polled via startDimsPoll() -->
 			<img
 				bind:this={videoRef as any}
-				src={`http://localhost:8000/api/cameras/${cameraId}/preview-stream`}
+				src={`${API_URL}/api/cameras/${cameraId}/preview-stream`}
 				alt="Camera preview"
 				class="pointer-events-none max-h-full max-w-full object-contain"
 				onerror={() => { isLoading = false; error = 'Failed to connect to camera'; }}

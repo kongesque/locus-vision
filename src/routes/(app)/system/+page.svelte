@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { API_URL } from '$lib/api';
 	import {
 		Activity,
 		Cpu,
@@ -86,7 +87,7 @@
 
 	async function fetchStats() {
 		try {
-			const res = await fetch('http://localhost:8000/api/system/stats');
+			const res = await fetch(`${API_URL}/api/system/stats`);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			stats = await res.json();
 			lastUpdated = new Date();
@@ -506,11 +507,11 @@
 					<div class="text-muted-foreground">
 						<span class="font-medium">Prometheus metrics:</span>
 						<code class="ml-2 rounded bg-background px-2 py-1 text-xs"
-							>http://localhost:8000/api/metrics</code
+							>{API_URL}/api/metrics</code
 						>
 					</div>
 					<a
-						href="http://localhost:8000/api/metrics"
+						href={`${API_URL}/api/metrics`}
 						target="_blank"
 						class="text-primary hover:underline"
 					>
