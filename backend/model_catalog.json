@@ -6,9 +6,9 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolo11n.onnx", "size_mb": 10.2 },
-        "onnx_fp16": { "file": "yolo11n_half.onnx", "size_mb": 5.1 },
-        "onnx_int8": { "file": "yolo11n_int8.onnx", "size_mb": 2.7 }
+        "onnx_fp32": { "file": "yolo11n.onnx", "size_mb": 10.2, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11n.onnx" },
+        "onnx_fp16": { "file": "yolo11n_half.onnx", "size_mb": 5.1, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11n_half.onnx" },
+        "onnx_int8": { "file": "yolo11n_int8.onnx", "size_mb": 2.7, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11n_int8.onnx" }
       }
     },
     "yolo11s": {
@@ -17,9 +17,9 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolo11s.onnx", "size_mb": 37.2 },
-        "onnx_fp16": { "file": "yolo11s_half.onnx", "size_mb": 18.6 },
-        "onnx_int8": { "file": "yolo11s_int8.onnx", "size_mb": 9.5 }
+        "onnx_fp32": { "file": "yolo11s.onnx", "size_mb": 37.2, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11s.onnx" },
+        "onnx_fp16": { "file": "yolo11s_half.onnx", "size_mb": 18.6, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11s_half.onnx" },
+        "onnx_int8": { "file": "yolo11s_int8.onnx", "size_mb": 9.5, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11s_int8.onnx" }
       }
     },
     "yolo11m": {
@@ -28,9 +28,9 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolo11m.onnx", "size_mb": 77.0 },
-        "onnx_fp16": { "file": "yolo11m_half.onnx", "size_mb": 38.5 },
-        "onnx_int8": { "file": "yolo11m_int8.onnx", "size_mb": 19.8 }
+        "onnx_fp32": { "file": "yolo11m.onnx", "size_mb": 77.0, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11m.onnx" },
+        "onnx_fp16": { "file": "yolo11m_half.onnx", "size_mb": 38.5, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11m_half.onnx" },
+        "onnx_int8": { "file": "yolo11m_int8.onnx", "size_mb": 19.8, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11m_int8.onnx" }
       }
     },
     "yolo11l": {
@@ -39,9 +39,9 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolo11l.onnx", "size_mb": 99.0 },
-        "onnx_fp16": { "file": "yolo11l_half.onnx", "size_mb": 49.5 },
-        "onnx_int8": { "file": "yolo11l_int8.onnx", "size_mb": 25.3 }
+        "onnx_fp32": { "file": "yolo11l.onnx", "size_mb": 99.0, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11l.onnx" },
+        "onnx_fp16": { "file": "yolo11l_half.onnx", "size_mb": 49.5, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11l_half.onnx" },
+        "onnx_int8": { "file": "yolo11l_int8.onnx", "size_mb": 25.3, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11l_int8.onnx" }
       }
     },
     "yolo11x": {
@@ -50,9 +50,9 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolo11x.onnx", "size_mb": 224.0 },
-        "onnx_fp16": { "file": "yolo11x_half.onnx", "size_mb": 112.0 },
-        "onnx_int8": { "file": "yolo11x_int8.onnx", "size_mb": 57.3 }
+        "onnx_fp32": { "file": "yolo11x.onnx", "size_mb": 224.0, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11x.onnx" },
+        "onnx_fp16": { "file": "yolo11x_half.onnx", "size_mb": 112.0, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11x_half.onnx" },
+        "onnx_int8": { "file": "yolo11x_int8.onnx", "size_mb": 57.3, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolo11x_int8.onnx" }
       }
     },
     "yolov8n": {
@@ -61,8 +61,8 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolov8n.onnx", "size_mb": 12.2 },
-        "onnx_int8": { "file": "yolov8n_int8.onnx", "size_mb": 3.4 },
+        "onnx_fp32": { "file": "yolov8n.onnx", "size_mb": 12.2, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolov8n.onnx" },
+        "onnx_int8": { "file": "yolov8n_int8.onnx", "size_mb": 3.4, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolov8n_int8.onnx" },
         "hailo": { "file": "yolov8n_h8l.hef", "size_mb": 7.0 }
       }
     },
@@ -72,8 +72,8 @@
       "purpose": "detection",
       "classes": "coco80",
       "formats": {
-        "onnx_fp32": { "file": "yolov8s.onnx", "size_mb": 44.8 },
-        "onnx_int8": { "file": "yolov8s_int8.onnx", "size_mb": 11.5 },
+        "onnx_fp32": { "file": "yolov8s.onnx", "size_mb": 44.8, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolov8s.onnx" },
+        "onnx_int8": { "file": "yolov8s_int8.onnx", "size_mb": 11.5, "url": "https://github.com/kongesque/locus-vision/releases/download/models-v1/yolov8s_int8.onnx" },
         "hailo": { "file": "yolov8s_h8l.hef", "size_mb": 35.0, "fps_estimate": 59 }
       }
     },

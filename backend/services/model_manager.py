@@ -12,6 +12,8 @@ import platform
 import time
 from typing import Any
 
+import httpx
+
 from services.onnx_detector import MODELS_DIR
 
 logger = logging.getLogger(__name__)
@@ -220,12 +222,18 @@ def get_installed_models(catalog: dict, backends: list[str]) -> list[dict]:
     return results
 
 
-# ── Download Manager (existing, preserved) ───────────────────────
+# ── Download Manager ─────────────────────────────────────────────
+
+# Map precision param → catalog format key
+_PRECISION_TO_FMT = {"int8": "onnx_int8", "fp16": "onnx_fp16", "fp32": "onnx_fp32"}
+
 
 class ModelManager:
-    """Manages downloading and exporting YOLO models."""
+    """Downloads pre-built model files from GitHub releases."""
+
     def __init__(self):
         self.download_jobs: dict[str, dict[str, Any]] = {}
+        self._catalog: dict | None = None
 
     def get_status(self) -> dict[str, dict[str, Any]]:
         """Return the current status of all downloads."""
@@ -233,80 +241,108 @@ class ModelManager:
 
     async def start_download(self, base_model: str, precision: str = "fp32"):
         """
-        Starts a background download/export job.
-        precision: 'fp32', 'fp16', or 'int8'
+        Start a background download job for a pre-built model file.
+        Looks up the download URL from the model catalog.
         """
         job_id = f"{base_model}_{precision}"
 
-        if job_id in self.download_jobs and self.download_jobs[job_id]["status"] in ["downloading", "exporting"]:
+        if job_id in self.download_jobs and self.download_jobs[job_id]["status"] == "downloading":
             return self.download_jobs[job_id]
 
         self.download_jobs[job_id] = {
             "status": "starting",
             "model": base_model,
             "precision": precision,
+            "progress": 0,
             "error": None,
             "started_at": time.time(),
-            "updated_at": time.time()
+            "updated_at": time.time(),
         }
 
-        # Run export in background so we don't block the API
-        asyncio.create_task(self._run_export(job_id, base_model, precision))
-
+        asyncio.create_task(self._run_download(job_id, base_model, precision))
         return self.download_jobs[job_id]
 
-    async def _run_export(self, job_id: str, base_model: str, precision: str):
+    def _get_catalog(self) -> dict:
+        if self._catalog is None:
+            self._catalog = load_model_catalog()
+        return self._catalog
+
+    def _resolve_url(self, base_model: str, precision: str) -> tuple[str, str]:
+        """Look up the download URL and target filename from the catalog."""
+        catalog = self._get_catalog()
+        model = catalog.get("models", {}).get(base_model)
+        if not model:
+            raise ValueError(f"Unknown model: {base_model}")
+
+        fmt_key = _PRECISION_TO_FMT.get(precision)
+        if not fmt_key or fmt_key not in model.get("formats", {}):
+            raise ValueError(
+                f"Format '{precision}' not available for {base_model}. "
+                f"Available: {list(model.get('formats', {}).keys())}"
+            )
+
+        fmt_info = model["formats"][fmt_key]
+        url = fmt_info.get("url")
+        if not url:
+            raise ValueError(
+                f"No download URL for {base_model} {precision}. "
+                f"This format may need to be exported manually with: "
+                f"python backend/scripts/export_model.py {base_model} --{precision}"
+            )
+
+        return url, fmt_info["file"]
+
+    async def _run_download(self, job_id: str, base_model: str, precision: str):
         try:
+            url, filename = self._resolve_url(base_model, precision)
+            target_path = os.path.join(MODELS_DIR, filename)
+            tmp_path = target_path + ".tmp"
+
+            os.makedirs(MODELS_DIR, exist_ok=True)
+
             self.download_jobs[job_id]["status"] = "downloading"
             self.download_jobs[job_id]["updated_at"] = time.time()
 
-            # The export script handles both download (.pt) and export (.onnx)
-            # Find python executable for the current venv
-            import sys
-            python_exe = sys.executable
+            logger.info("Downloading %s from %s", filename, url)
 
-            script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "export_model.py")
+            async with httpx.AsyncClient(follow_redirects=True, timeout=300) as client:
+                async with client.stream("GET", url) as resp:
+                    resp.raise_for_status()
 
-            cmd = [python_exe, script_path, base_model]
-            if precision == "fp16":
-                cmd.append("--half")
-            elif precision == "int8":
-                cmd.append("--int8")
+                    total = int(resp.headers.get("content-length", 0))
+                    downloaded = 0
 
-            # We assume downloading if it takes a while before exporting
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
+                    with open(tmp_path, "wb") as f:
+                        async for chunk in resp.aiter_bytes(chunk_size=65536):
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total > 0:
+                                self.download_jobs[job_id]["progress"] = round(
+                                    downloaded / total * 100
+                                )
+                                self.download_jobs[job_id]["updated_at"] = time.time()
 
-            # Monitor output to update state to 'exporting'
-            while True:
-                line = await process.stdout.readline()
-                if not line:
-                    break
-                decoded_line = line.decode('utf-8').strip()
-                print(f"[ModelManager] {decoded_line}")
+            # Atomic rename so partial files never appear as valid
+            os.replace(tmp_path, target_path)
 
-                if "Exporting" in decoded_line:
-                    self.download_jobs[job_id]["status"] = "exporting"
-                    self.download_jobs[job_id]["updated_at"] = time.time()
+            logger.info("Downloaded %s (%.1f MB)", filename, os.path.getsize(target_path) / 1e6)
+            self.download_jobs[job_id]["status"] = "done"
+            self.download_jobs[job_id]["progress"] = 100
 
-            await process.wait()
-
-            if process.returncode == 0:
-                self.download_jobs[job_id]["status"] = "done"
-            else:
-                stderr = (await process.stderr.read()).decode('utf-8')
-                print(f"[ModelManager] Error: {stderr}")
-                self.download_jobs[job_id]["status"] = "error"
-                self.download_jobs[job_id]["error"] = stderr
-
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error("Download failed for %s: %s", job_id, e)
+            self.download_jobs[job_id]["status"] = "error"
+            self.download_jobs[job_id]["error"] = f"Download failed: {e}"
+            # Clean up partial file
+            tmp = os.path.join(MODELS_DIR, f"{base_model}.tmp")
+            if os.path.exists(tmp):
+                os.remove(tmp)
         except Exception as e:
-            print(f"[ModelManager] Exception: {e}")
+            logger.error("Download error for %s: %s", job_id, e)
             self.download_jobs[job_id]["status"] = "error"
             self.download_jobs[job_id]["error"] = str(e)
         finally:
             self.download_jobs[job_id]["updated_at"] = time.time()
+
 
 model_manager = ModelManager()

@@ -24,15 +24,20 @@ https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 
 ## Features
 
-- 🎯 **Detection & Tracking** — YOLO via ONNX Runtime with ByteTrack multi-object tracking across concurrent camera streams
-- 🔲 **Zones & Lines** — Polygon zone counting with dwell time and capacity alerts, directional line crossing with wrong-way detection
-- 📹 **Live Streaming** — MJPEG video with real-time telemetry, live heatmaps, and activity feeds
-- 🎞️ **Video Processing** — Upload videos for batch analysis with a crash-resilient background job queue
-- 📊 **Analytics & Export** — Peak hours analysis, hourly aggregations, CSV/JSON export, Prometheus-compatible metrics
-- 📷 **Camera Management** — ONVIF auto-discovery, RTSP streams, USB webcams, V4L2 hardware decoding
-- 🧠 **Model Flexibility** — Pick a model by name and the system auto-detects your hardware (Hailo, CUDA, CoreML, CPU) to select the best execution path. Browse, download, and remove models from Settings.
-- 🔒 **Auth & Security** — JWT with rate-limited login, role-based access, session management
-- 📈 **System Monitor** — Per-camera FPS breakdown, CPU/memory/storage dashboard, Parquet archival of old data
+### Real-Time Monitoring
+- 🎯 **Detection & Tracking** — YOLO models (v5–v11) via ONNX Runtime + ByteTrack multi-object tracking across concurrent streams
+- 🔲 **Spatial Analytics** — Polygon zones for occupancy counting, directional lines for crossing detection, dwell time, capacity alerts
+- 📹 **Live Streams** — MJPEG video with overlaid detections, real-time heatmaps, and event feeds
+
+### Intelligence & Insights
+- 🧠 **Adaptive Models** — Automatically detects hardware (Hailo, CUDA, CoreML, CPU ARM) and picks the optimal model format. Download models with one click from Settings.
+- 📊 **Rich Analytics** — Peak hours analysis, hourly aggregations, CSV/JSON export, Prometheus metrics endpoint
+- 🎞️ **Batch Processing** — Upload videos for offline analysis with a crash-resilient job queue
+
+### Deployment & Integration
+- 📷 **Camera Flexibility** — RTSP streams, ONVIF auto-discovery, USB webcams, V4L2 hardware decoding
+- 🔒 **Access Control** — JWT authentication, role-based access (admin/viewer), rate-limited login
+- 📈 **System Insights** — Per-camera FPS breakdown, CPU/memory/storage monitoring, data archival with Parquet
 
 ## Use Cases
 
@@ -81,11 +86,24 @@ pnpm dev
 
 Open [localhost:5173](http://localhost:5173) (app) or [localhost:8000/api/docs](http://localhost:8000/api/docs) (API docs).
 
-Models are managed from **Settings > Models** in the UI. The system auto-detects your hardware and downloads the optimal format. To manually export a quantized model instead:
+### Model Management
+
+Models are managed from **Settings > Models** in the UI. The system auto-detects your hardware (Hailo, CUDA, CoreML, or CPU) and shows which model formats are compatible.
+
+**Downloading models:**
+- Click "Download" next to any model to fetch it from GitHub Releases
+- The best precision for your hardware is automatically selected (INT8 on Pi, FP32 on Mac/desktop)
+- No additional dependencies required on your machine
+
+**Current models:** YOLO11 (n/s/m/l/x), YOLOv8 (n/s), YOLOv6n, YOLOv5 variants, YOLOX. See `MODELS.md` for the full list and available formats per model.
+
+**For developers:** To add new models to the release, export them with the CLI tool (requires `ultralytics` on your dev machine only):
 
 ```sh
 source backend/.venv/bin/activate
+pip install ultralytics
 python backend/scripts/export_model.py yolo11n --int8
+# Then upload to the GitHub release and update model_catalog.json with the download URL
 ```
 
 ## Performance
