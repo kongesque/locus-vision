@@ -15,16 +15,16 @@
 
 	const userTabs = [
 		{ id: 'profile', label: 'Profile', icon: User },
-		{ id: 'security', label: 'Security', icon: Shield },
 		{ id: 'appearance', label: 'Appearance', icon: Palette },
-		{ id: 'models', label: 'Models', icon: Box }
+		{ id: 'models', label: 'Models', icon: Box },
+		{ id: 'security', label: 'Security', icon: Shield }
 	];
 
 	const adminTabs = [
 		{ id: 'profile', label: 'Profile', icon: User },
-		{ id: 'security', label: 'Security', icon: Shield },
 		{ id: 'appearance', label: 'Appearance', icon: Palette },
 		{ id: 'models', label: 'Models', icon: Box },
+		{ id: 'security', label: 'Security', icon: Shield },
 		{ id: 'admin', label: 'Admin', icon: Users }
 	];
 
