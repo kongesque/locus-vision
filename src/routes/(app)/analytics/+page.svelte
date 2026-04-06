@@ -12,7 +12,6 @@
 		Clock,
 		TrendingUp
 	} from '@lucide/svelte';
-	import UploadArea from '$lib/components/video-analytics/upload-area.svelte';
 	import type { PageData } from './$types';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -238,11 +237,6 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		</div>
-	</div>
-
-	<!-- Quick Upload -->
-	<div class="mb-2">
-		<UploadArea />
 	</div>
 
 	{#if isLoading}

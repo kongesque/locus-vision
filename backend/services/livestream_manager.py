@@ -239,9 +239,18 @@ class StreamContext:
             
             # Intelligent per-track event emission
             for box in result.boxes:
-                track_id = box.get("track_id")
+                track_id = box.get("id")
                 label = box["label"]
-                zone_name = box.get("in_zone", "Camera View") or "Camera View"
+                # in_zone is a boolean — derive a readable zone name from zone_events or fallback
+                zone_name = "Camera View"
+                if box.get("in_zone"):
+                    # Find which zone this track is in from the current zone_events
+                    for ze in result.zone_events:
+                        if ze.get("track_id") == track_id and ze.get("event_type") == "enter":
+                            zone_name = ze.get("zone_id", "Zone")
+                            break
+                    else:
+                        zone_name = "Zone"
                 dwell_time = box.get("dwell_time", 0.0)
                 point = {"x": box["x"] + box["w"] / 2, "y": box["y"] + box["h"]}
                 
@@ -333,8 +342,8 @@ class StreamContext:
                     "direction": direction,
                 })
 
-            # Zone counts update
-            if result.zone_counts:
+            # Zone counts update — always emit total_count so frontend stays in sync
+            if result.zone_counts or result.total_count > 0:
                 ws_events.append({
                     "type": "zone_update",
                     "zone_counts": result.zone_counts,
