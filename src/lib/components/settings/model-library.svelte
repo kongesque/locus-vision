@@ -195,14 +195,18 @@
 	}
 
 	async function uploadFile(file: File) {
-		if (!file.name.endsWith('.onnx')) {
+
+		const validExtensions = ['.onnx', '.tflite', '.pt'];
+		if (!validExtensions.some((ext) => file.name.endsWith(ext))) {
 			uploadState = 'error';
-			uploadError = 'Only .onnx files are supported';
+			uploadError = 'Supported formats: .onnx, .tflite, .pt';
 			return;
 		}
 
 		uploadState = 'uploading';
-		uploadProgress = `Uploading ${file.name}...`;
+		uploadProgress = file.name.endsWith('.pt')
+			? `Uploading and converting ${file.name} to ONNX...`
+			: `Uploading ${file.name}...`;
 		uploadError = '';
 		uploadWarnings = [];
 
@@ -292,7 +296,7 @@
 	<Card.Content>
 		<input
 			type="file"
-			accept=".onnx"
+			accept=".onnx,.tflite,.pt"
 			class="hidden"
 			id="model-upload-input"
 			onchange={handleFileSelect}
@@ -326,9 +330,9 @@
 				{:else}
 					<Upload class="size-8 text-muted-foreground" />
 					<div>
-						<p class="text-sm font-medium">Drop .onnx file here</p>
+						<p class="text-sm font-medium">Drop model file here</p>
 						<p class="mt-1 text-xs text-muted-foreground">
-							YOLO models exported to ONNX format (max 500 MB)
+							YOLO models — ONNX, TFLite, or PyTorch (.pt auto-converts to ONNX)
 						</p>
 					</div>
 				{/if}

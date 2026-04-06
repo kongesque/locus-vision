@@ -1,9 +1,9 @@
 """
-ONNX-based YOLO detector with ByteTrack tracking.
+YOLO detector with ByteTrack tracking (ONNX + TFLite backends).
 
-Drop-in replacement for ultralytics.YOLO — uses onnxruntime for inference
-and supervision for tracking. Drastically reduces the dependency footprint
-(no PyTorch required at runtime).
+Drop-in replacement for ultralytics.YOLO — uses onnxruntime or tflite-runtime
+for inference and supervision for tracking. Drastically reduces the dependency
+footprint (no PyTorch required at runtime).
 """
 
 import os
@@ -275,17 +275,218 @@ class OnnxDetector:
             pass
 
 
+# ── TFLite Detector ─────────────────────────────────────────────
+
+class TFLiteDetector:
+    """
+    Loads a YOLO TFLite model and runs detection + optional ByteTrack tracking.
+    Same interface as OnnxDetector so they are interchangeable via get_detector().
+    """
+
+    def __init__(self, model_path: str, conf_threshold: float = 0.15, iou_threshold: float = 0.45):
+        import tflite_runtime.interpreter as tflite
+
+        self.conf_threshold = conf_threshold
+        self.iou_threshold = iou_threshold
+        self.names = _load_class_names()
+
+        self.interpreter = tflite.Interpreter(model_path=model_path, num_threads=4)
+        self.interpreter.allocate_tensors()
+
+        input_details = self.interpreter.get_input_details()[0]
+        output_details = self.interpreter.get_output_details()[0]
+
+        self._input_index = input_details["index"]
+        self._output_index = output_details["index"]
+        self._input_dtype = input_details["dtype"]
+
+        # TFLite YOLO input is typically [1, H, W, 3] (NHWC)
+        in_shape = input_details["shape"]  # e.g. [1, 640, 640, 3]
+        if len(in_shape) == 4 and in_shape[3] == 3:
+            # NHWC
+            self.input_h = int(in_shape[1])
+            self.input_w = int(in_shape[2])
+            self._nhwc = True
+        elif len(in_shape) == 4 and in_shape[1] == 3:
+            # NCHW (rare for TFLite but possible)
+            self.input_h = int(in_shape[2])
+            self.input_w = int(in_shape[3])
+            self._nhwc = False
+        else:
+            self.input_h = 640
+            self.input_w = 640
+            self._nhwc = True
+
+        # Check if model uses quantized (uint8) input
+        self._quantized = self._input_dtype == np.uint8
+        if self._quantized:
+            self._input_scale = float(input_details.get("quantization_parameters", {}).get("scales", [1.0])[0])
+            self._input_zero_point = int(input_details.get("quantization_parameters", {}).get("zero_points", [0])[0])
+
+        # Check output quantization
+        self._output_quantized = output_details["dtype"] == np.uint8
+        if self._output_quantized:
+            q = output_details.get("quantization_parameters", {})
+            self._output_scale = float(q.get("scales", [1.0])[0])
+            self._output_zero_point = int(q.get("zero_points", [0])[0])
+
+    def _preprocess(self, frame: np.ndarray) -> tuple[np.ndarray, float, float, int, int]:
+        """Letterbox-resize + normalize. Returns format matching model expectation."""
+        img_h, img_w = frame.shape[:2]
+
+        r = min(self.input_w / img_w, self.input_h / img_h)
+        new_w, new_h = int(img_w * r), int(img_h * r)
+        pad_w = (self.input_w - new_w) // 2
+        pad_h = (self.input_h - new_h) // 2
+
+        resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
+        canvas = np.full((self.input_h, self.input_w, 3), 114, dtype=np.uint8)
+        canvas[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = resized
+
+        # BGR → RGB
+        canvas = canvas[:, :, ::-1]
+
+        if self._quantized:
+            blob = canvas.astype(np.uint8)
+        else:
+            blob = canvas.astype(np.float32) / 255.0
+
+        if self._nhwc:
+            blob = blob[np.newaxis, ...]  # [1, H, W, 3]
+        else:
+            blob = blob.transpose(2, 0, 1)[np.newaxis, ...]  # [1, 3, H, W]
+
+        return blob, r, r, pad_w, pad_h
+
+    def _postprocess(
+        self, output: np.ndarray, ratio: float, pad_w: int, pad_h: int,
+        classes: list[int] | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Parse TFLite output → (boxes_xyxy, scores, class_ids). Same as ONNX postprocess."""
+        # Dequantize output if needed
+        if self._output_quantized:
+            output = (output.astype(np.float32) - self._output_zero_point) * self._output_scale
+
+        preds = output[0]
+        if preds.shape[0] < preds.shape[1]:
+            preds = preds.T
+
+        box_preds = preds[:, :4]
+        cls_scores = preds[:, 4:]
+
+        class_ids = cls_scores.argmax(axis=1)
+        scores = cls_scores[np.arange(len(cls_scores)), class_ids]
+
+        mask = scores >= self.conf_threshold
+        box_preds = box_preds[mask]
+        scores = scores[mask]
+        class_ids = class_ids[mask]
+
+        if classes is not None and len(classes) > 0:
+            cls_mask = np.isin(class_ids, classes)
+            box_preds = box_preds[cls_mask]
+            scores = scores[cls_mask]
+            class_ids = class_ids[cls_mask]
+
+        if len(box_preds) == 0:
+            return np.empty((0, 4)), np.empty(0), np.empty(0, dtype=int)
+
+        cx, cy, w, h = box_preds[:, 0], box_preds[:, 1], box_preds[:, 2], box_preds[:, 3]
+        x1 = cx - w / 2
+        y1 = cy - h / 2
+        x2 = cx + w / 2
+        y2 = cy + h / 2
+        boxes_xyxy = np.stack([x1, y1, x2, y2], axis=1)
+
+        boxes_xyxy[:, [0, 2]] = (boxes_xyxy[:, [0, 2]] - pad_w) / ratio
+        boxes_xyxy[:, [1, 3]] = (boxes_xyxy[:, [1, 3]] - pad_h) / ratio
+
+        keep = _nms(boxes_xyxy, scores, self.iou_threshold)
+        return boxes_xyxy[keep], scores[keep], class_ids[keep].astype(int)
+
+    def _run_inference(self, blob: np.ndarray) -> np.ndarray:
+        """Run TFLite inference and return raw output."""
+        self.interpreter.set_tensor(self._input_index, blob)
+        self.interpreter.invoke()
+        return self.interpreter.get_tensor(self._output_index)
+
+    def detect(self, frame: np.ndarray, classes: list[int] | None = None) -> DetectionResult:
+        """Run detection only (no tracking)."""
+        start_time = time.perf_counter()
+
+        blob, ratio, _, pad_w, pad_h = self._preprocess(frame)
+        output = self._run_inference(blob)
+        boxes_xyxy, scores, class_ids = self._postprocess(output, ratio, pad_w, pad_h, classes)
+
+        inference_ms = (time.perf_counter() - start_time) * 1000
+        self._record_metrics(inference_ms, len(boxes_xyxy))
+
+        if len(boxes_xyxy) == 0:
+            return DetectionResult(np.empty((0, 4)), np.empty(0), np.empty(0, dtype=int))
+
+        boxes_xywh = OnnxDetector._xyxy_to_xywh(boxes_xyxy)
+        return DetectionResult(boxes_xywh, scores, class_ids)
+
+    def get_detections(self, frame: np.ndarray, classes: list[int] | None = None) -> sv.Detections:
+        """Run detection and return supervision Detections object for upstream tracking."""
+        start_time = time.perf_counter()
+
+        blob, ratio, _, pad_w, pad_h = self._preprocess(frame)
+        output = self._run_inference(blob)
+        boxes_xyxy, scores, class_ids = self._postprocess(output, ratio, pad_w, pad_h, classes)
+
+        inference_ms = (time.perf_counter() - start_time) * 1000
+        self._record_metrics(inference_ms, len(boxes_xyxy))
+
+        if len(boxes_xyxy) == 0:
+            return sv.Detections.empty()
+
+        return sv.Detections(
+            xyxy=boxes_xyxy,
+            confidence=scores,
+            class_id=class_ids,
+        )
+
+    def _record_metrics(self, inference_ms: float, num_detections: int):
+        """Record detection metrics to the global collector."""
+        try:
+            from services.metrics_collector import metrics_collector
+            model_name = "unknown"
+            for name, detector in _detector_cache.items():
+                if detector is self:
+                    model_name = name
+                    break
+            metrics_collector.record_detection(inference_ms, num_detections, model_name)
+        except Exception:
+            pass
+
+
 # ── Model cache (singleton per model name) ───────────────────────
 
-_detector_cache: dict[str, OnnxDetector] = {}
+_detector_cache: dict[str, OnnxDetector | TFLiteDetector] = {}
+
+# Supported model extensions in priority order
+_MODEL_EXTENSIONS = [".onnx", ".tflite"]
 
 
-def get_detector(model_name: str, conf_threshold: float | None = None) -> OnnxDetector:
+def _create_detector(
+    model_path: str, conf_threshold: float = 0.15
+) -> OnnxDetector | TFLiteDetector:
+    """Create the right detector class based on file extension."""
+    if model_path.endswith(".tflite"):
+        return TFLiteDetector(model_path, conf_threshold=conf_threshold)
+    return OnnxDetector(model_path, conf_threshold=conf_threshold)
+
+
+def get_detector(
+    model_name: str, conf_threshold: float | None = None
+) -> OnnxDetector | TFLiteDetector:
     """
-    Get or create a cached OnnxDetector for the given model name.
+    Get or create a cached detector for the given model name.
 
     Resolution order:
-    1. Legacy exact match: `data/models/{model_name}.onnx` (backwards-compatible)
+    1. Legacy exact match: `data/models/{model_name}.onnx` or `.tflite`
     2. Catalog resolution: look up model_name in catalog, pick best available format
 
     This ensures existing database rows with names like 'yolo11n_int8' still work,
@@ -297,12 +498,13 @@ def get_detector(model_name: str, conf_threshold: float | None = None) -> OnnxDe
 
     ct = conf_threshold if conf_threshold is not None else 0.15
 
-    # Strategy 1: Legacy exact filename match (e.g. "yolo11n_int8" → yolo11n_int8.onnx)
-    exact_path = os.path.join(MODELS_DIR, f"{model_name}.onnx")
-    if os.path.exists(exact_path):
-        print(f"[OnnxDetector] Loading model (legacy): {exact_path} (conf={ct})")
-        _detector_cache[cache_key] = OnnxDetector(exact_path, conf_threshold=ct)
-        return _detector_cache[cache_key]
+    # Strategy 1: Legacy exact filename match (try each supported extension)
+    for ext in _MODEL_EXTENSIONS:
+        exact_path = os.path.join(MODELS_DIR, f"{model_name}{ext}")
+        if os.path.exists(exact_path):
+            print(f"[Detector] Loading model (legacy): {exact_path} (conf={ct})")
+            _detector_cache[cache_key] = _create_detector(exact_path, conf_threshold=ct)
+            return _detector_cache[cache_key]
 
     # Strategy 2: Catalog resolution (e.g. "yolo11n" → best available format)
     try:
@@ -311,9 +513,9 @@ def get_detector(model_name: str, conf_threshold: float | None = None) -> OnnxDe
         backends = detect_backends()
         resolved = resolve_model(model_name, catalog, backends)
         model_path = resolved["path"]
-        print(f"[OnnxDetector] Loading model (catalog): {model_path} "
+        print(f"[Detector] Loading model (catalog): {model_path} "
               f"(format={resolved['backend']}, conf={ct})")
-        _detector_cache[cache_key] = OnnxDetector(model_path, conf_threshold=ct)
+        _detector_cache[cache_key] = _create_detector(model_path, conf_threshold=ct)
         return _detector_cache[cache_key]
     except (ValueError, FileNotFoundError):
         pass
@@ -321,17 +523,19 @@ def get_detector(model_name: str, conf_threshold: float | None = None) -> OnnxDe
     # Nothing found
     raise FileNotFoundError(
         f"Model '{model_name}' not found. "
-        f"No exact file '{model_name}.onnx' in {MODELS_DIR} and no catalog match. "
-        f"Download models from Settings > Models."
+        f"No file '{model_name}.(onnx|tflite)' in {MODELS_DIR} and no catalog match. "
+        f"Download or upload models from Settings > Models."
     )
 
 
 def list_models() -> list[str]:
-    """List all available .onnx models in the models directory."""
+    """List all available model files in the models directory."""
     models = []
     if os.path.exists(MODELS_DIR):
         for f in os.listdir(MODELS_DIR):
-            if f.endswith(".onnx"):
-                models.append(f.replace(".onnx", ""))
-    return sorted(models)
+            for ext in _MODEL_EXTENSIONS:
+                if f.endswith(ext):
+                    models.append(f.replace(ext, ""))
+                    break
+    return sorted(set(models))
 

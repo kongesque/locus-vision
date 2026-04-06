@@ -1,6 +1,7 @@
 import os
 import glob
 import logging
+import tempfile
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Any
@@ -11,8 +12,130 @@ from database import get_app_setting
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_EXTENSIONS = {".onnx"}
+ALLOWED_EXTENSIONS = {".onnx", ".tflite", ".pt"}
 MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB
+
+def _check_yolo_output(out_shape: list, warnings: list[str]):
+    """Check if output shape looks like YOLO format and warn about non-COCO classes."""
+    int_dims = [s for s in out_shape if isinstance(s, int)]
+    if len(out_shape) == 3 and len(int_dims) >= 2:
+        dim1, dim2 = int_dims[-2], int_dims[-1]
+        # The smaller dim is the attributes dim (4 + num_classes)
+        attrs_dim = min(dim1, dim2)
+        if attrs_dim >= 5:
+            num_classes = attrs_dim - 4
+            if num_classes != 80:
+                warnings.append(
+                    f"Model has {num_classes} classes (COCO has 80). "
+                    f"Detection will work but class labels may not match."
+                )
+    else:
+        warnings.append(
+            f"Unexpected output shape {out_shape}. "
+            f"Expected [1, 4+num_classes, N] for YOLO detection models."
+        )
+
+
+def _validate_onnx(path: str) -> tuple[list, list, list[str]]:
+    """Validate an ONNX model file. Returns (in_shape, out_shape, warnings)."""
+    import onnxruntime as ort
+
+    try:
+        session = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid ONNX file: {e}")
+
+    try:
+        in_shape = list(session.get_inputs()[0].shape)
+        out_shape = list(session.get_outputs()[0].shape)
+        warnings: list[str] = []
+
+        if len(in_shape) != 4:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported input shape {in_shape}. Expected [1, 3, H, W] for YOLO models."
+            )
+        if isinstance(in_shape[1], int) and in_shape[1] != 3:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected 3 input channels, got {in_shape[1]}. Not an RGB image model."
+            )
+
+        _check_yolo_output(out_shape, warnings)
+        logger.info("Validated ONNX: input=%s, output=%s", in_shape, out_shape)
+        return in_shape, out_shape, warnings
+    finally:
+        del session
+
+
+def _validate_tflite(path: str) -> tuple[list, list, list[str]]:
+    """Validate a TFLite model file. Returns (in_shape, out_shape, warnings)."""
+    try:
+        import tflite_runtime.interpreter as tflite
+    except ImportError:
+        raise HTTPException(
+            status_code=400,
+            detail="TFLite runtime is not installed. Install with: pip install tflite-runtime"
+        )
+
+    try:
+        interpreter = tflite.Interpreter(model_path=path)
+        interpreter.allocate_tensors()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid TFLite file: {e}")
+
+    try:
+        in_details = interpreter.get_input_details()[0]
+        out_details = interpreter.get_output_details()[0]
+        in_shape = list(in_details["shape"].tolist())
+        out_shape = list(out_details["shape"].tolist())
+        warnings: list[str] = []
+
+        # TFLite YOLO is typically NHWC [1, H, W, 3]
+        if len(in_shape) != 4:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported input shape {in_shape}. Expected [1, H, W, 3] for YOLO models."
+            )
+        channels = in_shape[3] if in_shape[3] in (1, 3) else in_shape[1]
+        if channels != 3:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected 3 input channels, got {channels}. Not an RGB image model."
+            )
+
+        _check_yolo_output(out_shape, warnings)
+        logger.info("Validated TFLite: input=%s, output=%s", in_shape, out_shape)
+        return in_shape, out_shape, warnings
+    finally:
+        del interpreter
+
+
+def _convert_pt_to_onnx(pt_path: str, target_dir: str) -> str:
+    """
+    Convert a PyTorch .pt model to ONNX using ultralytics export.
+    Returns the path to the exported .onnx file.
+    """
+    try:
+        from ultralytics import YOLO
+    except ImportError:
+        raise HTTPException(
+            status_code=400,
+            detail="Ultralytics is not installed. Cannot convert .pt files. "
+                   "Upload an ONNX file instead, or install with: pip install ultralytics"
+        )
+
+    try:
+        model = YOLO(pt_path)
+        onnx_path = model.export(format="onnx", imgsz=640)
+        logger.info("Converted .pt → .onnx: %s", onnx_path)
+        return str(onnx_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to convert .pt to ONNX: {e}"
+        )
+
 
 router = APIRouter(prefix="/api/models", tags=["Models"])
 
@@ -124,70 +247,38 @@ async def upload_model(file: UploadFile = File(...)):
                     )
                 f.write(chunk)
 
-        # Validate with onnxruntime: load and check structure
-        import onnxruntime as ort
-        try:
-            session = ort.InferenceSession(tmp_path, providers=["CPUExecutionProvider"])
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid ONNX file — could not load model: {e}"
-            )
+        # Handle .pt → auto-convert to ONNX
+        converted_from_pt = False
+        if ext == ".pt":
+            # Ultralytics exports next to the source file, so use a temp dir
+            # with the proper .pt extension for it to work correctly
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pt_path = os.path.join(tmpdir, f"{safe_name}.pt")
+                os.replace(tmp_path, pt_path)
+                onnx_path = _convert_pt_to_onnx(pt_path, tmpdir)
+                # Move the resulting ONNX to our tmp_path location
+                tmp_path = target_path + ".tmp"
+                os.replace(onnx_path, tmp_path)
 
-        try:
-            input_meta = session.get_inputs()[0]
-            output_meta = session.get_outputs()[0]
-            in_shape = input_meta.shape   # expect [1, 3, H, W]
-            out_shape = output_meta.shape  # expect [1, 4+num_classes, N]
+            ext = ".onnx"
+            target_filename = f"{safe_name}.onnx"
+            target_path = os.path.join(MODELS_DIR, target_filename)
+            total_size = os.path.getsize(tmp_path)
+            converted_from_pt = True
 
-            warnings = []
+        # Validate model structure based on format
+        warnings: list[str] = []
+        in_shape: list = []
+        out_shape: list = []
 
-            # Validate input shape: [batch, 3, H, W]
-            if len(in_shape) != 4:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported input shape {in_shape}. Expected [1, 3, H, W] for YOLO models."
-                )
-            if isinstance(in_shape[1], int) and in_shape[1] != 3:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Expected 3 input channels, got {in_shape[1]}. This doesn't appear to be an RGB image model."
-                )
+        if ext == ".onnx":
+            in_shape, out_shape, warnings = _validate_onnx(tmp_path)
+        elif ext == ".tflite":
+            in_shape, out_shape, warnings = _validate_tflite(tmp_path)
 
-            # Validate output shape: [1, 4+num_classes, N]
-            if len(out_shape) == 3:
-                # Determine which dim is the "attributes" dim (4 + num_classes)
-                # YOLO outputs [1, 84, N] where 84 < N typically, or [1, N, 84]
-                dim1 = out_shape[1] if isinstance(out_shape[1], int) else None
-                dim2 = out_shape[2] if isinstance(out_shape[2], int) else None
-
-                num_classes = None
-                if dim1 is not None and dim1 >= 5:
-                    num_classes = dim1 - 4  # attrs dim is [1]
-                if dim2 is not None and dim2 >= 5 and (num_classes is None or dim2 < dim1):
-                    num_classes = dim2 - 4  # attrs dim is [2]
-
-                if num_classes is not None and num_classes != 80:
-                    warnings.append(
-                        f"Model has {num_classes} classes (COCO has 80). "
-                        f"Detection will work but class labels may not match."
-                    )
-            else:
-                warnings.append(
-                    f"Unexpected output shape {out_shape}. "
-                    f"Expected [1, 4+num_classes, N] for YOLO detection models."
-                )
-
-            logger.info(
-                "Validated ONNX model: input=%s %s, output=%s %s",
-                input_meta.name, in_shape,
-                output_meta.name, out_shape,
-            )
-        finally:
-            del session
-
-        # Atomic rename
-        os.replace(tmp_path, target_path)
+        # Atomic rename (skip if conversion already placed it correctly)
+        if tmp_path != target_path:
+            os.replace(tmp_path, target_path)
         size_mb = round(total_size / (1024 * 1024), 1)
         logger.info("Uploaded model: %s (%.1f MB)", target_filename, size_mb)
 
@@ -198,6 +289,8 @@ async def upload_model(file: UploadFile = File(...)):
             "input_shape": [s if isinstance(s, int) else None for s in in_shape],
             "output_shape": [s if isinstance(s, int) else None for s in out_shape],
         }
+        if converted_from_pt:
+            warnings.append("Converted from PyTorch (.pt) to ONNX format.")
         if warnings:
             result["warnings"] = warnings
         return result
@@ -235,7 +328,7 @@ async def delete_model(model_name: str, request: Request):
 
     # Strategy 2: Fallback — delete any files matching the model name pattern
     # Catches legacy files like yolo11n_int8.onnx, yolo11n_half.onnx, yolo11n.onnx
-    for pattern in [f"{model_name}.onnx", f"{model_name}_*.onnx", f"{model_name}*.hef"]:
+    for pattern in [f"{model_name}.onnx", f"{model_name}_*.onnx", f"{model_name}.tflite", f"{model_name}_*.tflite", f"{model_name}*.hef"]:
         for path in glob.glob(os.path.join(MODELS_DIR, pattern)):
             basename = os.path.basename(path)
             if basename not in deleted_files:
