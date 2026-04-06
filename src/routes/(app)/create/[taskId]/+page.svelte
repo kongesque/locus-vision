@@ -192,11 +192,11 @@
 	<title>Create · Locus</title>
 </svelte:head>
 
-<div class="flex h-[calc(100vh-4rem)] flex-1 flex-col gap-4 p-4">
+<div class="flex h-[calc(100vh-4rem)] flex-1 flex-col gap-4 overflow-hidden p-4">
 	<!-- Main Content -->
-	<div class="flex min-h-0 flex-1 gap-4">
+	<div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
 		<!-- Left: Video Canvas -->
-		<Card.Root class="flex flex-[3] flex-col overflow-hidden p-0">
+		<Card.Root class="flex min-h-[250px] flex-col overflow-hidden p-0 lg:flex-[3]">
 			<VideoPreview
 				cameraId={taskId}
 				{zones}
@@ -211,7 +211,7 @@
 		</Card.Root>
 
 		<!-- Right: Tools -->
-		<div class="flex min-w-[350px] flex-1 flex-col min-h-0 overflow-hidden">
+		<div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:max-w-[400px]">
 			<ToolsPanel
 				{zones}
 				{selectedZoneId}
