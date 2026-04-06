@@ -1,10 +1,10 @@
-![Locus Vision Banner](./banner.png)
+![Locus Vision — self-hosted video analytics platform for edge devices](./banner.png)
 
-<h1 align="center">Locus Vision 👁️</h1>
+<h1 align="center">Locus Vision — Open-Source Video Analytics</h1>
 
 <p align="center">
-  <strong>Open-source, real-time video analytics engine optimized for edge devices</strong><br/>
-  Turn any camera into a smart sensor — object detection, tracking, line crossing, and zone counting at the edge.
+  <strong>Self-hosted, real-time video analytics for edge devices and Raspberry Pi</strong><br/>
+  Turn any camera into a smart sensor — people counting, object detection, line crossing, and zone analytics. No cloud. No subscriptions. Runs fully local.
 </p>
 
 <p align="center">
@@ -18,44 +18,56 @@
 
 ---
 
-Locus Vision is a **self-hosted video analytics platform** built for edge devices. It performs real-time **object detection and tracking** using YOLO + ONNX Runtime, with support for **INT8/FP16 quantized models** that cut model size by 70% while maintaining accuracy. Everything stays local — no cloud, no subscriptions, no data leaving your network.
+Locus Vision is an **open-source, self-hosted video analytics platform** built for edge devices and Raspberry Pi. It performs real-time **people counting, object detection, and multi-object tracking** using YOLO + ONNX Runtime, with support for **INT8/FP16 quantized models** that cut model size by 70% while maintaining accuracy. Everything runs locally — no cloud, no subscriptions, no data leaving your network.
+
+Whether you need a **computer vision dashboard** for retail foot traffic, a **local CCTV analytics** system for warehouses, or a **people counter** for any space, Locus Vision runs entirely on-device — including on a Raspberry Pi 5 with the Hailo-8L AI HAT.
 
 https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 
 ## Features
 
 ### Real-Time Monitoring
-- 🎯 **Detection & Tracking** — YOLO models (v5–v11) via ONNX Runtime + ByteTrack multi-object tracking across concurrent streams
-- 🔲 **Spatial Analytics** — Polygon zones for occupancy counting, directional lines for crossing detection, dwell time, capacity alerts
-- 📹 **Live Streams** — MJPEG video with overlaid detections, real-time heatmaps, and event feeds
+- **Object Detection & Tracking** — YOLO models (v5–v11) via ONNX Runtime + ByteTrack multi-object tracking across concurrent camera streams
+- **People Counting & Zone Analytics** — Polygon zones for occupancy counting, directional line crossing (A→B, B→A, or both), dwell time measurement, capacity alerts
+- **Live Streams** — MJPEG video with overlaid detections, real-time spatial heatmaps, and SSE-based event feeds per camera
+
+### Camera Configuration
+- **Visual Zone Editor** — Draw polygon zones and directional lines directly on a live preview canvas
+- **Per-Class Filtering** — Select which object classes to detect per camera (person, vehicle, etc.)
+- **Granular Controls** — Per-camera confidence threshold, FPS cap, and model selection
+- **Camera Flexibility** — RTSP streams, ONVIF auto-discovery, USB webcams, V4L2 hardware decoding
 
 ### Intelligence & Insights
-- 🧠 **Adaptive Models** — Automatically detects hardware (Hailo, CUDA, CoreML, CPU ARM) and picks the optimal model format. Download models with one click from Settings.
-- 📊 **Rich Analytics** — Peak hours analysis, hourly aggregations, CSV/JSON export, Prometheus metrics endpoint
-- 🎞️ **Batch Processing** — Upload videos for offline analysis with a crash-resilient job queue
+- **Adaptive Models** — Auto-detects hardware (Hailo-8L, CUDA, CoreML, CPU ARM) and picks the optimal model format
+- **Model Library UI** — Browse and download YOLO models from Settings with one click; hardware-appropriate precision (INT8/FP16/FP32) selected automatically
+- **Rich Analytics** — Peak hours analysis, hourly crowd aggregations, spatial heatmaps, CSV/JSON export for downstream BI tools
+- **Batch Video Processing** — Upload recorded footage for offline analysis with a crash-resilient job queue, per-task progress, and result thumbnails
 
-### Deployment & Integration
-- 📷 **Camera Flexibility** — RTSP streams, ONVIF auto-discovery, USB webcams, V4L2 hardware decoding
-- 🔒 **Access Control** — JWT authentication, role-based access (admin/viewer), rate-limited login
-- 📈 **System Insights** — Per-camera FPS breakdown, CPU/memory/storage monitoring, data archival with Parquet
+### Operations & Admin
+- **Multi-User Access** — JWT + Argon2id auth with role-based access (admin/viewer), session management, and rate-limited login (5 attempts / 5 min)
+- **User Management** — Admin controls for user creation, role assignment, and public signup toggle; users can update profile and change password
+- **System Monitoring** — Per-camera FPS breakdown (input, process, detect, skipped), detector latency percentiles (p50/p90/p99), CPU/memory/storage with historical charts
+- **Prometheus Metrics** — Scrape `/api/metrics` for system, camera, and detector telemetry
+- **Data Archival** — Automatic downsampling of old metrics and cleanup of orphaned video files
 
 ## Use Cases
 
-- **Retail & Foot Traffic** — Count visitors entering/exiting zones, measure dwell time across store areas
-- **Warehouse & Logistics** — Monitor loading docks, track forklift movement, detect restricted zone breaches
-- **Parking & Access Control** — Track occupancy in real time, log vehicle entry/exit with line crossing
-- **Wildlife & Environmental** — Observe animal activity patterns, generate spatial heatmaps from trail cameras
+- **Retail Foot Traffic Analytics** — Count visitors entering/exiting zones, measure dwell time, identify peak hours across store areas
+- **Warehouse & Logistics Monitoring** — Monitor loading docks, track forklift movement, detect restricted zone breaches
+- **Parking Occupancy Detection** — Track parking space occupancy in real time, log vehicle entry/exit with directional line crossing
+- **Crowd Analytics & People Counting** — Measure occupancy in public spaces, offices, or events without cloud dependency
+- **Wildlife & Environmental Monitoring** — Observe animal activity patterns, generate spatial heatmaps from trail cameras
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | SvelteKit 2, Svelte 5, TypeScript |
+| Frontend | SvelteKit 5, Svelte 5, TypeScript |
 | Styling | Tailwind CSS 4, shadcn-svelte |
 | Backend | FastAPI, Python 3.11+ |
-| Database | SQLite (async), DuckDB (analytics) |
+| Database | SQLite / aiosqlite (operational), DuckDB (analytics / Parquet) |
 | AI / Vision | ONNX Runtime, YOLO (v5–v11), ByteTrack, OpenCV, Hailo-8L |
-| Auth | JWT + Argon2id |
+| Auth | JWT (access + refresh tokens), Argon2id |
 
 ## Quick Start
 
@@ -67,7 +79,7 @@ cd locusvision
 docker compose up --build
 ```
 
-Open [localhost:3000](http://localhost:3000) (app) or [localhost:8000/api/docs](http://localhost:8000/api/docs) (API docs). 
+Open [localhost:3000](http://localhost:3000) (app) or [localhost:8000/api/docs](http://localhost:8000/api/docs) (API docs).
 
 ### Manual
 
@@ -86,9 +98,13 @@ pnpm dev
 
 Open [localhost:5173](http://localhost:5173) (app) or [localhost:8000/api/docs](http://localhost:8000/api/docs) (API docs).
 
-### Model Management
+### First-Time Setup
 
-Models are managed from **Settings > Models** in the UI. The system auto-detects your hardware (Hailo, CUDA, CoreML, or CPU) and shows which model formats are compatible.
+On first launch, navigate to `/get-started` to create the initial admin account. After that, additional users can be invited by an admin or (optionally) self-register if public signup is enabled in **Settings > Admin**.
+
+## Model Management
+
+Models are managed from **Settings > Models** in the UI. The system auto-detects your hardware (Hailo, CUDA, CoreML, or CPU) and shows which formats are compatible for each model.
 
 **Downloading models:**
 - Click "Download" next to any model to fetch it from GitHub Releases
@@ -166,4 +182,3 @@ Contributions welcome — bug reports, feature requests, and pull requests all h
 ---
 
 Made with ❤️ by <a href="https://github.com/kongesque">kongesque</a>
-

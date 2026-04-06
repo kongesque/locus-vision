@@ -94,7 +94,7 @@ def preprocess(frame: np.ndarray, target_h: int = 640, target_w: int = 640) -> n
 
 
 def benchmark_model(model_path: str, frame: np.ndarray, verbose: bool = True) -> dict | None:
-    providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+    providers = ["CUDAExecutionProvider", "CoreMLExecutionProvider", "CPUExecutionProvider"]
     available = ort.get_available_providers()
     use_providers = [p for p in providers if p in available] or ["CPUExecutionProvider"]
 

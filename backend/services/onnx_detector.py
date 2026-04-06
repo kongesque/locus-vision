@@ -115,8 +115,8 @@ class OnnxDetector:
         self.iou_threshold = iou_threshold
         self.names = _load_class_names()
 
-        # Pick the best available provider
-        providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        # Pick the best available provider: CUDA > CoreML > CPU
+        providers = ["CUDAExecutionProvider", "CoreMLExecutionProvider", "CPUExecutionProvider"]
         available = ort.get_available_providers()
         use_providers = [p for p in providers if p in available] or ["CPUExecutionProvider"]
 
