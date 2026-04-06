@@ -1,12 +1,18 @@
 import os
 import glob
-from fastapi import APIRouter, Request, HTTPException
+import logging
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Any
 
 from services.model_manager import model_manager, get_installed_models, resolve_model, load_model_catalog
 from services.onnx_detector import list_models, MODELS_DIR
 from database import get_app_setting
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_EXTENSIONS = {".onnx"}
+MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB
 
 router = APIRouter(prefix="/api/models", tags=["Models"])
 
@@ -70,6 +76,97 @@ async def trigger_download(req: DownloadRequest, request: Request):
 async def get_download_status() -> dict[str, dict[str, Any]]:
     """Poll the status of active and recent model downloads."""
     return model_manager.get_status()
+
+
+@router.post("/upload")
+async def upload_model(file: UploadFile = File(...)):
+    """
+    Upload a custom ONNX model file.
+
+    Validates the file extension and ONNX header, then saves to data/models/.
+    The model becomes immediately available for selection.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Sanitize filename: keep only alphanumeric, hyphens, underscores
+    base_name = os.path.splitext(os.path.basename(file.filename))[0]
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in base_name)
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    target_filename = f"{safe_name}{ext}"
+    target_path = os.path.join(MODELS_DIR, target_filename)
+    tmp_path = target_path + ".tmp"
+
+    os.makedirs(MODELS_DIR, exist_ok=True)
+
+    try:
+        # Stream to temp file with size check
+        total_size = 0
+        with open(tmp_path, "wb") as f:
+            while True:
+                chunk = await file.read(65536)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB"
+                    )
+                f.write(chunk)
+
+        # Validate ONNX magic bytes (protobuf header for ONNX starts with \x08)
+        with open(tmp_path, "rb") as f:
+            header = f.read(8)
+        if len(header) < 4:
+            raise HTTPException(status_code=400, detail="File is too small to be a valid ONNX model")
+
+        # Try loading with onnxruntime to validate
+        import onnxruntime as ort
+        try:
+            session = ort.InferenceSession(tmp_path, providers=["CPUExecutionProvider"])
+            input_meta = session.get_inputs()[0]
+            output_meta = session.get_outputs()[0]
+            logger.info(
+                "Validated ONNX model: input=%s %s, output=%s %s",
+                input_meta.name, input_meta.shape,
+                output_meta.name, output_meta.shape,
+            )
+            del session
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid ONNX model: {e}"
+            )
+
+        # Atomic rename
+        os.replace(tmp_path, target_path)
+        size_mb = round(total_size / (1024 * 1024), 1)
+        logger.info("Uploaded model: %s (%.1f MB)", target_filename, size_mb)
+
+        return {
+            "filename": target_filename,
+            "model_name": safe_name,
+            "size_mb": size_mb,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Upload failed: %s", e)
+        raise HTTPException(status_code=500, detail="Upload failed")
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 @router.delete("/{model_name}")

@@ -11,7 +11,9 @@
 		Zap,
 		HardDrive,
 		Check,
-		AlertCircle
+		AlertCircle,
+		Upload,
+		FileUp
 	} from '@lucide/svelte';
 
 	const API_URL = 'http://localhost:8000';
@@ -39,6 +41,11 @@
 	let downloadingModels = new SvelteSet<string>();
 	let removingModels = new SvelteSet<string>();
 	let downloadStatus = $state<Record<string, string>>({});
+
+	let isDragging = $state(false);
+	let uploadState = $state<'idle' | 'uploading' | 'success' | 'error'>('idle');
+	let uploadProgress = $state('');
+	let uploadError = $state('');
 
 	let installedModels = $derived(models.filter((m) => m.installed));
 	let availableModels = $derived(models.filter((m) => !m.installed));
@@ -160,6 +167,72 @@
 		}
 	}
 
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		isDragging = true;
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		e.preventDefault();
+		isDragging = false;
+	}
+
+	async function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		isDragging = false;
+
+		const files = e.dataTransfer?.files;
+		if (!files?.length) return;
+		await uploadFile(files[0]);
+	}
+
+	function handleFileSelect(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (!input.files?.length) return;
+		uploadFile(input.files[0]);
+		input.value = '';
+	}
+
+	async function uploadFile(file: File) {
+		if (!file.name.endsWith('.onnx')) {
+			uploadState = 'error';
+			uploadError = 'Only .onnx files are supported';
+			return;
+		}
+
+		uploadState = 'uploading';
+		uploadProgress = `Uploading ${file.name}...`;
+		uploadError = '';
+
+		try {
+			const formData = new FormData();
+			formData.append('file', file);
+
+			const res = await fetch(`${API_URL}/api/models/upload`, {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => null);
+				throw new Error(data?.detail ?? `Upload failed (${res.status})`);
+			}
+
+			const result = await res.json();
+			uploadState = 'success';
+			uploadProgress = `${result.filename} uploaded (${result.size_mb} MB)`;
+			await refreshModels();
+
+			setTimeout(() => {
+				uploadState = 'idle';
+				uploadProgress = '';
+			}, 3000);
+		} catch (err) {
+			uploadState = 'error';
+			uploadError = err instanceof Error ? err.message : 'Upload failed';
+		}
+	}
+
 	async function refreshModels() {
 		try {
 			const res = await fetch(`${API_URL}/api/models/registry`);
@@ -203,6 +276,57 @@
 				<span>No backends detected. Restart the backend to re-detect hardware.</span>
 			</div>
 		{/if}
+	</Card.Content>
+</Card.Root>
+
+<!-- Upload Model -->
+<Card.Root>
+	<Card.Header>
+		<Card.Title class="text-lg">Upload Model</Card.Title>
+		<Card.Description>Drag and drop an ONNX model file or click to browse</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		<input
+			type="file"
+			accept=".onnx"
+			class="hidden"
+			id="model-upload-input"
+			onchange={handleFileSelect}
+		/>
+		<label
+			for="model-upload-input"
+			class="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 text-center transition-colors {isDragging
+				? 'border-primary bg-primary/5'
+				: 'border-muted-foreground/25 hover:border-muted-foreground/50'}"
+			ondragover={handleDragOver}
+			ondragleave={handleDragLeave}
+			ondrop={handleDrop}
+		>
+			{#if uploadState === 'uploading'}
+				<Loader2 class="size-8 animate-spin text-muted-foreground" />
+				<p class="text-sm text-muted-foreground">{uploadProgress}</p>
+			{:else if uploadState === 'success'}
+				<Check class="size-8 text-green-500" />
+				<p class="text-sm text-green-600">{uploadProgress}</p>
+			{:else if uploadState === 'error'}
+				<AlertCircle class="size-8 text-destructive" />
+				<p class="text-sm text-destructive">{uploadError}</p>
+				<p class="text-xs text-muted-foreground">Click or drop to try again</p>
+			{:else}
+				{#if isDragging}
+					<FileUp class="size-8 text-primary" />
+					<p class="text-sm font-medium text-primary">Drop model here</p>
+				{:else}
+					<Upload class="size-8 text-muted-foreground" />
+					<div>
+						<p class="text-sm font-medium">Drop .onnx file here</p>
+						<p class="mt-1 text-xs text-muted-foreground">
+							YOLO models exported to ONNX format (max 500 MB)
+						</p>
+					</div>
+				{/if}
+			{/if}
+		</label>
 	</Card.Content>
 </Card.Root>
 
