@@ -460,10 +460,18 @@
 																				Filter classes...
 																			{:else}
 																				{#each zone.classes as cls}
-																					<span
-																						class="rounded bg-secondary px-1 font-mono text-[10px] text-secondary-foreground"
-																						>{cls}</span
+																					<button
+																						type="button"
+																						class="group/tag inline-flex items-center gap-0.5 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground hover:bg-destructive/20 hover:text-destructive"
+																						onclick={(e) => {
+																							e.stopPropagation();
+																							e.preventDefault();
+																							onZoneClassesChanged(zone.id, zone.classes.filter((c) => c !== cls));
+																						}}
 																					>
+																						{cls}
+																						<X class="size-3 opacity-50 group-hover/tag:opacity-100" />
+																					</button>
 																				{/each}
 																			{/if}
 																		</div>
@@ -583,10 +591,18 @@
 														Filter classes...
 													{:else}
 														{#each fullFrameClasses as cls}
-															<span
-																class="rounded bg-secondary px-1 font-mono text-[10px] text-secondary-foreground"
-																>{cls}</span
+															<button
+																type="button"
+																class="group/tag inline-flex items-center gap-0.5 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground hover:bg-destructive/20 hover:text-destructive"
+																onclick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																	onFullFrameClassesChanged(fullFrameClasses.filter((c) => c !== cls));
+																}}
 															>
+																{cls}
+																<X class="size-3 opacity-50 group-hover/tag:opacity-100" />
+															</button>
 														{/each}
 													{/if}
 												</div>
