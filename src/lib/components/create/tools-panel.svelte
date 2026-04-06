@@ -179,7 +179,7 @@
 						<div class="mt-1 text-[11px] text-muted-foreground">
 							Download a model to get started.
 						</div>
-						<a href="/settings" class="mt-2 inline-block text-xs font-medium text-primary hover:underline">
+						<a href="/settings" class="mt-2 inline-block cursor-pointer text-xs font-medium text-primary hover:underline">
 							Go to Settings → Models
 						</a>
 					</div>
@@ -191,7 +191,7 @@
 							if (v) onModelChange(v);
 						}}
 					>
-						<Select.Trigger class="h-auto w-full">
+						<Select.Trigger class="h-auto w-full cursor-pointer">
 							<div class="flex items-center gap-2">
 								<span class="font-medium">{selectedModelInfo?.label || selectedModel}</span>
 								{#if selectedModelInfo?.active_format}
@@ -330,8 +330,8 @@
 
 				<Tabs.Root bind:value={activeTab} class="w-full">
 					<Tabs.List class="w-full">
-						<Tabs.Trigger value="zone-based" class="flex-1">Zone based</Tabs.Trigger>
-						<Tabs.Trigger value="full-frame" class="flex-1">Full frame</Tabs.Trigger>
+						<Tabs.Trigger value="zone-based" class="flex-1 cursor-pointer">Zone based</Tabs.Trigger>
+						<Tabs.Trigger value="full-frame" class="flex-1 cursor-pointer">Full frame</Tabs.Trigger>
 					</Tabs.List>
 
 					<div class="mt-2 rounded-xl border border-border p-1.5">
@@ -342,12 +342,13 @@
 									value={drawingMode}
 									onValueChange={(v) => v && onDrawingModeChange(v as 'polygon' | 'line')}
 									class="w-full justify-stretch"
+									variant="outline"
 								>
-									<ToggleGroup.Item value="polygon" aria-label="Zone" class="flex-1 gap-2">
+									<ToggleGroup.Item value="polygon" aria-label="Zone" class="flex-1 cursor-pointer gap-2">
 										<Square class="h-4 w-4" />
 										Zone
 									</ToggleGroup.Item>
-									<ToggleGroup.Item value="line" aria-label="Line" class="flex-1 gap-2">
+									<ToggleGroup.Item value="line" aria-label="Line" class="flex-1 cursor-pointer gap-2">
 										<Slash class="h-4 w-4" />
 										Line
 									</ToggleGroup.Item>
@@ -401,7 +402,7 @@
 																	/>
 																{:else}
 																	<span
-																		class="block truncate text-sm font-medium"
+																		class="block cursor-pointer truncate text-sm font-medium"
 																		ondblclick={(e) => {
 																			e.stopPropagation();
 																			handleStartEditing(zone.id, zone.name);
@@ -462,7 +463,7 @@
 																				{#each zone.classes as cls}
 																					<button
 																						type="button"
-																						class="group/tag inline-flex items-center gap-0.5 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground hover:bg-destructive/20 hover:text-destructive"
+																						class="group/tag inline-flex cursor-pointer items-center gap-0.5 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground hover:bg-destructive/20 hover:text-destructive"
 																						onclick={(e) => {
 																							e.stopPropagation();
 																							e.preventDefault();
@@ -527,7 +528,7 @@
 																			<ToggleGroup.Item
 																				value="both"
 																				aria-label="A ↔ B"
-																				class="flex-1 gap-1 rounded-[4px] font-mono text-[10px] data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+																				class="flex-1 cursor-pointer gap-1 rounded-[4px] font-mono text-[10px] data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
 																			>
 																				<ArrowUpDown class="h-3 w-3" />
 																				A ↔ B
@@ -535,7 +536,7 @@
 																			<ToggleGroup.Item
 																				value="in"
 																				aria-label="A → B"
-																				class="flex-1 gap-1 rounded-[4px] font-mono text-[10px] data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+																				class="flex-1 cursor-pointer gap-1 rounded-[4px] font-mono text-[10px] data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
 																			>
 																				<ArrowDown class="h-3 w-3" />
 																				A → B
@@ -543,7 +544,7 @@
 																			<ToggleGroup.Item
 																				value="out"
 																				aria-label="B → A"
-																				class="flex-1 gap-1 rounded-[4px] font-mono text-[10px] data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+																				class="flex-1 cursor-pointer gap-1 rounded-[4px] font-mono text-[10px] data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
 																			>
 																				<ArrowUp class="h-3 w-3" />
 																				B → A
@@ -593,7 +594,7 @@
 														{#each fullFrameClasses as cls}
 															<button
 																type="button"
-																class="group/tag inline-flex items-center gap-0.5 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground hover:bg-destructive/20 hover:text-destructive"
+																class="group/tag inline-flex cursor-pointer items-center gap-0.5 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground hover:bg-destructive/20 hover:text-destructive"
 																onclick={(e) => {
 																	e.stopPropagation();
 																	e.preventDefault();
@@ -647,7 +648,7 @@
 	<div class="border-t p-3">
 		<Separator class="my-2.5" />
 		<Button
-			class="h-10 w-full text-sm"
+			class="h-10 w-full cursor-pointer text-sm"
 			disabled={(activeTab === 'zone-based' && zones.length === 0) ||
 				installedModels.length === 0 ||
 				!selectedModel}
