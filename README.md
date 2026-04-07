@@ -39,7 +39,7 @@ https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 
 ### Intelligence & Insights
 - **Adaptive Models** — Auto-detects hardware (Hailo-8L, CUDA, CoreML, CPU ARM) and picks the optimal model format
-- **Model Library UI** — Browse and download YOLO models from Settings with one click; hardware-appropriate precision (INT8/FP16/FP32) selected automatically
+- **Model Library UI** — Browse and download YOLO models with one click, or drag-and-drop your own models (.onnx, .tflite, .pt); hardware-appropriate precision auto-selected
 - **Rich Analytics** — Peak hours analysis, hourly crowd aggregations, spatial heatmaps, CSV/JSON export for downstream BI tools
 - **Batch Video Processing** — Upload recorded footage for offline analysis with a crash-resilient job queue, per-task progress, and result thumbnails
 
@@ -66,7 +66,7 @@ https://github.com/user-attachments/assets/647da3b4-74e2-4da8-872c-6d9200b7c0af
 | Styling | Tailwind CSS 4, shadcn-svelte |
 | Backend | FastAPI, Python 3.11+ |
 | Database | SQLite / aiosqlite (operational), DuckDB (analytics / Parquet) |
-| AI / Vision | ONNX Runtime, YOLO (v5–v11), ByteTrack, OpenCV, Hailo-8L |
+| AI / Vision | ONNX Runtime, TFLite Runtime, YOLO (v5–v11), ByteTrack, OpenCV, Hailo-8L |
 | Auth | JWT (access + refresh tokens), Argon2id |
 
 ## Quick Start
@@ -83,13 +83,15 @@ Open [localhost:3000](http://localhost:3000) (app) or [localhost:8000/api/docs](
 
 ### Manual
 
+> **Requires Python 3.11–3.12** (for TFLite Runtime and full ML package compatibility).
+
 ```sh
 # Clone & install
 git clone https://github.com/kongesque/locus-vision.git
 cd locusvision && pnpm install
 
-# Setup backend
-cd backend && python3 -m venv .venv && source .venv/bin/activate
+# Setup backend (Python 3.11 or 3.12)
+cd backend && python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt && cd ..
 
 # Run
@@ -110,6 +112,15 @@ Models are managed from **Settings > Models** in the UI. The system auto-detects
 - Click "Download" next to any model to fetch it from GitHub Releases
 - The best precision for your hardware is automatically selected (INT8 on Pi, FP32 on Mac/desktop)
 - No additional dependencies required on your machine
+
+**Uploading custom models:**
+- Drag and drop model files directly into the **Upload Model** area in Settings > Models
+- Supported formats:
+  - **`.onnx`** — ONNX models, ready to use immediately
+  - **`.tflite`** — TensorFlow Lite models, optimized for ARM/edge devices
+  - **`.pt`** — PyTorch models, auto-converted to ONNX on upload (requires `ultralytics`)
+- All uploads are validated before saving — invalid models are rejected with a clear error
+- Non-COCO models (custom classes) are accepted with a warning about label mapping
 
 **Current models:** YOLO11 (n/s/m/l/x), YOLOv8 (n/s), YOLOv6n, YOLOv5 variants, YOLOX. See `MODELS.md` for the full list and available formats per model.
 

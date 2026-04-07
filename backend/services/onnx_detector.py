@@ -279,32 +279,14 @@ class OnnxDetector:
 
 def _get_tflite_interpreter_class():
     """
-    Try multiple import paths for the TFLite Interpreter class.
-    Supports: tflite-runtime, ai-edge-litert, full tensorflow.
+    Import the TFLite Interpreter class from tflite-runtime.
     Returns the Interpreter class or None if unavailable.
     """
-    # 1. Standalone tflite-runtime (lightweight, preferred on edge devices)
     try:
         from tflite_runtime.interpreter import Interpreter
         return Interpreter
     except ImportError:
-        pass
-
-    # 2. ai-edge-litert (Google's newer standalone package)
-    try:
-        from ai_edge_litert import Interpreter
-        return Interpreter
-    except ImportError:
-        pass
-
-    # 3. Full TensorFlow (heavy but widely available)
-    try:
-        from tensorflow.lite.python.interpreter import Interpreter
-        return Interpreter
-    except ImportError:
-        pass
-
-    return None
+        return None
 
 
 # ── TFLite Detector ─────────────────────────────────────────────

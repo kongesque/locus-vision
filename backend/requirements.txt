@@ -5,10 +5,7 @@ supervision>=0.27.0
 opencv-python-headless>=4.10.0
 numpy>=2.0.0
 onnxruntime>=1.19.0
-# TFLite support (optional — install ONE of these):
-#   pip install tflite-runtime     (lightweight, best for edge devices)
-#   pip install ai-edge-litert     (Google's newer standalone package)
-#   pip install tensorflow          (full TF, includes TFLite interpreter)
+tflite-runtime>=2.14.0
 httpx>=0.28.1
 aiosqlite>=0.22.1
 pydantic-settings>=2.13.1

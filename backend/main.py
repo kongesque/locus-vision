@@ -1,5 +1,19 @@
 """LocusVision FastAPI backend application."""
 
+import sys
+import warnings
+
+MIN_PYTHON = (3, 11)
+MAX_PYTHON = (3, 12)
+if not (MIN_PYTHON <= sys.version_info[:2] <= MAX_PYTHON):
+    warnings.warn(
+        f"LocusVision is tested on Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}"
+        f"–{MAX_PYTHON[0]}.{MAX_PYTHON[1]}. "
+        f"You are running {sys.version.split()[0]} — "
+        f"some features (e.g. TFLite) may not be available.",
+        stacklevel=1,
+    )
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
