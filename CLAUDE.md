@@ -11,6 +11,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm build` - Production build (outputs to `dist/`)
 - `pnpm preview` - Preview production build
 
+**Docker alternative:** `docker compose up --build` — runs app on port 3000, API on port 8000.
+
+**Backend venv:** `source backend/.venv/bin/activate` — required before all `cd backend && ...` commands.
+
+**Python version:** 3.11 or 3.12 only (TFLite Runtime and ML packages have strict version requirements).
+
 ### Testing
 - `pnpm test` - Run all frontend unit tests (Vitest with --run)
 - `pnpm test:unit` - Run Vitest in watch mode
@@ -19,13 +25,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `cd backend && pytest tests/test_specific.py` - Run a single backend test file
 - `cd backend && pytest tests/test_specific.py::test_function -v` - Run a single backend test
 
-Note: Backend commands require the venv to be active: `source backend/.venv/bin/activate`
-
 ### Code Quality
 - `pnpm lint` - ESLint + Prettier check
 - `pnpm format` - Format all files with Prettier
 - `pnpm check` - Type-check Svelte files with svelte-check
 - `pnpm check:watch` - Type-check in watch mode
+
+### Model & Benchmarking
+- `python backend/scripts/export_model.py yolo11n --int8` - Export quantized model to `data/models/` (requires `ultralytics`)
+- `python backend/scripts/benchmark_inference.py` - Benchmark ONNX inference on current hardware
 
 ## Code Style
 
@@ -53,6 +61,7 @@ Interactive API docs are at `http://localhost:8000/docs`.
 - The hook validates tokens against the FastAPI backend (`/api/auth/me`) and auto-refreshes expired access tokens
 - User data is attached to `event.locals.user` and available in all route loaders
 - User type defined in `src/app.d.ts`: `{ id: number; email: string; name: string; role: 'admin' | 'viewer' } | null`
+- First-time setup: navigate to `/get-started` to create the initial admin account
 
 **Route Structure**
 - `src/routes/(app)/` - Authenticated application routes (livestream, video-analytics, analytics, settings, system)
@@ -99,12 +108,12 @@ All services are singletons started/stopped in `main.py` lifespan:
 - `services/job_queue.py` - SQLite-backed video processing queue with single worker thread. Processes videos sequentially using `AnalyticsEngine`, updates progress in DB. Crash-resilient (resets stale tasks on startup).
 - `services/analytics_engine.py` - Stateful per-session engine wrapping ONNX detector with ByteTracker. Handles zone-based counting, line crossing detection (vector cross-product), and event generation. Used by both live streams and video processing.
 - `services/livestream_manager.py` - Manages per-camera inference loops (multiprocessing), MJPEG streaming, and SSE telemetry. Each camera runs in isolated process with its own `AnalyticsEngine` instance.
-- `services/onnx_detector.py` - ONNX Runtime YOLO inference with NMS. Supports FP16/INT8 quantized models. Dynamic model loading from `data/models/`.
+- `services/onnx_detector.py` - ONNX Runtime YOLO inference with NMS. Supports FP16/INT8 quantized models and TFLite. Auto-detects hardware execution provider (Hailo → CUDA → CoreML → CPU). Dynamic model loading from `data/models/`.
 - `services/metrics_collector.py` - Background metrics aggregation (CPU, memory, FPS, detection counts) written to SQLite for time-series queries.
 - `services/downsampler.py` - Archives old high-frequency metrics data.
 - `services/archiver.py` - Cleans up old processed videos and orphaned files.
 - `services/duckdb_client.py` - DuckDB connection manager for analytics queries (Parquet output).
-- `services/model_manager.py` - Discovers and validates ONNX models in `data/models/` directory.
+- `services/model_manager.py` - Discovers and validates ONNX/TFLite models in `data/models/` directory.
 
 **Database Architecture**
 - SQLite (aiosqlite) for primary data: users, cameras, video tasks, events, sessions, metrics
@@ -114,7 +123,7 @@ All services are singletons started/stopped in `main.py` lifespan:
 - Migrations are inline in `database.py` `init_db()` — new columns go in both the CREATE TABLE statement and the migrations dict for existing databases (no Alembic)
 
 **AI/Vision Pipeline**
-1. **Detection**: ONNX Runtime with YOLO models (supports FP16/INT8 quantization)
+1. **Detection**: ONNX Runtime with YOLO models (supports FP16/INT8 quantization) and TFLite; hardware auto-selected (Hailo-8L → CUDA → CoreML → CPU ARM)
 2. **Tracking**: ByteTrack (via supervision library) per-camera instances prevent ID collision
 3. **Analytics**: Zone-based counting with polygon containment, directional line crossing (A→B, B→A, both)
 4. **Events**: Zone entries/exits, line crossings, track lifecycle events written to DuckDB for analytics
