@@ -85,12 +85,13 @@ def detect_backends() -> list[str]:
     except Exception:
         pass
 
-    # TFLite (lightweight edge runtime)
+    # TFLite (try all available runtimes)
     try:
-        import tflite_runtime.interpreter as tflite  # noqa: F401
-        backends.append("tflite")
-        logger.info("Hardware detected: TFLite runtime")
-    except ImportError:
+        from services.onnx_detector import _get_tflite_interpreter_class
+        if _get_tflite_interpreter_class() is not None:
+            backends.append("tflite")
+            logger.info("Hardware detected: TFLite runtime")
+    except Exception:
         pass
 
     # CPU ONNX is always available — add all precisions as fallback

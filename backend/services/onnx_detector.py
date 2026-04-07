@@ -275,6 +275,38 @@ class OnnxDetector:
             pass
 
 
+# ── TFLite compatibility ─────────────────────────────────────────
+
+def _get_tflite_interpreter_class():
+    """
+    Try multiple import paths for the TFLite Interpreter class.
+    Supports: tflite-runtime, ai-edge-litert, full tensorflow.
+    Returns the Interpreter class or None if unavailable.
+    """
+    # 1. Standalone tflite-runtime (lightweight, preferred on edge devices)
+    try:
+        from tflite_runtime.interpreter import Interpreter
+        return Interpreter
+    except ImportError:
+        pass
+
+    # 2. ai-edge-litert (Google's newer standalone package)
+    try:
+        from ai_edge_litert import Interpreter
+        return Interpreter
+    except ImportError:
+        pass
+
+    # 3. Full TensorFlow (heavy but widely available)
+    try:
+        from tensorflow.lite.python.interpreter import Interpreter
+        return Interpreter
+    except ImportError:
+        pass
+
+    return None
+
+
 # ── TFLite Detector ─────────────────────────────────────────────
 
 class TFLiteDetector:
@@ -284,13 +316,19 @@ class TFLiteDetector:
     """
 
     def __init__(self, model_path: str, conf_threshold: float = 0.15, iou_threshold: float = 0.45):
-        import tflite_runtime.interpreter as tflite
+        Interpreter = _get_tflite_interpreter_class()
+        if Interpreter is None:
+            raise ImportError(
+                "No TFLite runtime found. Install one of: "
+                "pip install tflite-runtime, pip install ai-edge-litert, "
+                "or pip install tensorflow"
+            )
 
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.names = _load_class_names()
 
-        self.interpreter = tflite.Interpreter(model_path=model_path, num_threads=4)
+        self.interpreter = Interpreter(model_path=model_path, num_threads=4)
         self.interpreter.allocate_tensors()
 
         input_details = self.interpreter.get_input_details()[0]

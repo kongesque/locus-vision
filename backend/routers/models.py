@@ -70,16 +70,19 @@ def _validate_onnx(path: str) -> tuple[list, list, list[str]]:
 
 def _validate_tflite(path: str) -> tuple[list, list, list[str]]:
     """Validate a TFLite model file. Returns (in_shape, out_shape, warnings)."""
-    try:
-        import tflite_runtime.interpreter as tflite
-    except ImportError:
+    from services.onnx_detector import _get_tflite_interpreter_class
+
+    Interpreter = _get_tflite_interpreter_class()
+    if Interpreter is None:
         raise HTTPException(
             status_code=400,
-            detail="TFLite runtime is not installed. Install with: pip install tflite-runtime"
+            detail="No TFLite runtime found. Install one of: "
+                   "pip install tflite-runtime, pip install ai-edge-litert, "
+                   "or pip install tensorflow"
         )
 
     try:
-        interpreter = tflite.Interpreter(model_path=path)
+        interpreter = Interpreter(model_path=path)
         interpreter.allocate_tensors()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid TFLite file: {e}")
