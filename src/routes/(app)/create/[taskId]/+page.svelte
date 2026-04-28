@@ -7,6 +7,7 @@
 	import VideoPreview from '$lib/components/create/video-preview.svelte';
 	import ToolsPanel from '$lib/components/create/tools-panel.svelte';
 	import type { Point, Zone } from '$lib/components/create/drawing-canvas.svelte';
+	import { pickZoneColor } from '$lib/zone-colors';
 	import { onMount } from 'svelte';
 
 	import { videoStore } from '$lib/stores/video.svelte';
@@ -74,7 +75,7 @@
 			type: drawingMode,
 			name: `${drawingMode === 'line' ? 'Line' : 'Zone'} ${zones.length + 1}`,
 			classes: [],
-			color: '#fbbd05',
+			color: pickZoneColor(zones.map((z) => z.color).filter((c): c is string => !!c)),
 			direction: 'both'
 		};
 		zones = [...zones, newZone];

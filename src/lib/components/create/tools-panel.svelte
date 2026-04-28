@@ -27,6 +27,7 @@
 	import { cn } from '$lib/utils';
 	import type { Zone } from './drawing-canvas.svelte';
 	import { COCO_CLASSES } from '$lib/coco-classes';
+	import { hexToRgba } from '$lib/zone-colors';
 	import { tick } from 'svelte';
 
 	interface InstalledModel {
@@ -365,14 +366,15 @@
 												</div>
 											{:else}
 												{#each zones as zone, index (zone.id)}
+													{@const zoneColor = zone.color || '#fbbd05'}
 													<!-- Zone Item -->
 													<div
 														class={cn(
-															'group flex flex-col rounded-lg border transition-all duration-150',
-															selectedZoneId === zone.id
-																? 'border-yellow-500/50 bg-muted'
-																: 'border-border bg-muted hover:border-yellow-500/50'
+															'group flex flex-col rounded-lg border bg-muted transition-all duration-150'
 														)}
+														style={selectedZoneId === zone.id
+															? `border-color: ${hexToRgba(zoneColor, 0.5)};`
+															: ''}
 													>
 														<!-- Header Row -->
 														<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -382,12 +384,10 @@
 															onclick={() => onZoneSelected(zone.id)}
 														>
 															<div
-																class={cn(
-																	'h-2.5 w-2.5 shrink-0 rounded-full transition-colors',
-																	selectedZoneId === zone.id
-																		? 'bg-yellow-500'
-																		: 'bg-muted-foreground/40'
-																)}
+																class="h-2.5 w-2.5 shrink-0 rounded-full transition-colors"
+																style={selectedZoneId === zone.id
+																	? `background-color: ${zoneColor};`
+																	: `background-color: ${hexToRgba(zoneColor, 0.5)};`}
 															></div>
 
 															<div class="min-w-0 flex-1">
@@ -414,10 +414,11 @@
 															</div>
 
 															<span
-																class={cn(
-																	'shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]',
-																	'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
-																)}
+																class="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]"
+																style="background-color: {hexToRgba(
+																	zoneColor,
+																	0.2
+																)}; color: {zoneColor};"
 															>
 																{zone.classes.length === 0 ? 'ALL' : zone.classes.length}
 															</span>

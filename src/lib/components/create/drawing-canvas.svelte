@@ -17,6 +17,7 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { hexToRgba, pickZoneColor } from '$lib/zone-colors';
 
 	interface Props {
 		width: number;
@@ -50,6 +51,11 @@
 	let currentPoints = $state<Point[]>([]);
 	let isDrawing = $state(false);
 	let currentMousePos = $state<Point | null>(null);
+
+	// Color the next-to-be-created zone will use (preview during drawing)
+	let nextColor = $derived(
+		pickZoneColor(zones.map((z) => z.color).filter((c): c is string => !!c))
+	);
 
 	// Editing state
 	let draggingPointIndex = $state<number | null>(null);
@@ -129,11 +135,12 @@
 		zones.forEach((zone) => {
 			if (zone.points.length === 0) return;
 			const isSelected = zone.id === selectedZoneId;
+			const zoneColor = zone.color || '#fbbd05';
 
 			ctx.beginPath();
 			ctx.lineWidth = isSelected ? lineWidth * 1.2 : lineWidth;
-			ctx.strokeStyle = isSelected ? '#fbbd05' : 'rgba(251, 189, 5, 0.6)';
-			ctx.fillStyle = isSelected ? 'rgba(251, 189, 5, 0.2)' : 'rgba(251, 189, 5, 0.1)';
+			ctx.strokeStyle = isSelected ? zoneColor : hexToRgba(zoneColor, 0.6);
+			ctx.fillStyle = isSelected ? hexToRgba(zoneColor, 0.2) : hexToRgba(zoneColor, 0.1);
 
 			ctx.moveTo(zone.points[0].x, zone.points[0].y);
 			for (let i = 1; i < zone.points.length; i++) {
@@ -224,7 +231,7 @@
 		if (currentPoints.length > 0) {
 			ctx.beginPath();
 			ctx.lineWidth = lineWidth;
-			ctx.strokeStyle = '#fbbd05';
+			ctx.strokeStyle = nextColor;
 			ctx.moveTo(currentPoints[0].x, currentPoints[0].y);
 
 			for (let i = 1; i < currentPoints.length; i++) {

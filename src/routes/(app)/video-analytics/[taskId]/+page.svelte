@@ -888,6 +888,13 @@
 
 						<!-- Zone Counts -->
 						{@const parsedZoneCounts = task.zone_counts ? JSON.parse(task.zone_counts) : null}
+						{@const parsedZones = task.zones ? JSON.parse(task.zones) : []}
+						{@const zoneMeta = Object.fromEntries(
+							(parsedZones || []).map((z: any) => [
+								z.id,
+								{ color: z.color || '#3b82f6', name: z.name }
+							])
+						)}
 						{#if parsedZoneCounts && Object.keys(parsedZoneCounts).length > 0}
 							<div class="mb-4">
 								<h4
@@ -898,13 +905,18 @@
 								</h4>
 								<div class="space-y-2">
 									{#each Object.entries(parsedZoneCounts) as [zoneId, count]}
+										{@const meta = zoneMeta[zoneId] || { color: '#3b82f6', name: null }}
 										<div
 											class="flex items-center justify-between rounded-lg border bg-muted/10 px-3 py-2.5"
 										>
 											<div class="flex items-center gap-2">
-												<div class="size-2 rounded-full bg-blue-400"></div>
-												<span class="truncate text-sm" title={zoneId}>
-													{zoneId.length > 8 ? `Zone ${zoneId.slice(0, 4)}` : zoneId}
+												<div
+													class="size-2 rounded-full"
+													style="background-color: {meta.color};"
+												></div>
+												<span class="truncate text-sm" title={meta.name || zoneId}>
+													{meta.name ||
+														(zoneId.length > 8 ? `Zone ${zoneId.slice(0, 4)}` : zoneId)}
 												</span>
 											</div>
 											<span class="font-mono text-lg font-bold">{count}</span>

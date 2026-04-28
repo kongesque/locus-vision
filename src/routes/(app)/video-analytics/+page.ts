@@ -16,6 +16,7 @@ export interface VideoTask {
     model_name: string | null;
     total_count: number | null;
     zone_counts: string | null;
+    zones: string | null;
     error_message: string | null;
 }
 
