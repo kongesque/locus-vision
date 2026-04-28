@@ -66,20 +66,21 @@
 	let rtspPreviewError = $state<string | null>(null);
 	let isTesting = $state(false);
 
-	async function testConnection() {
+	function testConnection() {
 		if (!manualUrl.trim()) return;
-		try {
-			isTesting = true;
-			rtspPreviewError = null;
-			rtspPreview = null;
-			// Simulation for now
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			rtspPreview = '/locus.png';
-		} catch (err) {
-			rtspPreviewError = err instanceof Error ? err.message : 'Connection failed';
-		} finally {
-			isTesting = false;
-		}
+		isTesting = true;
+		rtspPreviewError = null;
+		rtspPreview = `${API_URL}/api/cameras/preview?source=${encodeURIComponent(manualUrl.trim())}`;
+	}
+
+	function onPreviewLoad() {
+		isTesting = false;
+	}
+
+	function onPreviewError() {
+		isTesting = false;
+		rtspPreview = null;
+		rtspPreviewError = 'Could not connect to stream. Check the URL and credentials.';
 	}
 
 	// Watch for dialog open to trigger discovery
@@ -97,6 +98,9 @@
 			untrack(() => {
 				previewUrl = null;
 				selectedDiscoveryId = null;
+				rtspPreview = null;
+				rtspPreviewError = null;
+				isTesting = false;
 			});
 		}
 	});
@@ -292,9 +296,26 @@
 					{#if rtspPreviewError}
 						<div class="px-4 text-center text-sm text-red-500">{rtspPreviewError}</div>
 					{:else if rtspPreview}
-						<img src={rtspPreview} alt="Preview" class="h-full w-full object-cover" />
+						<img
+							src={rtspPreview}
+							alt="Preview"
+							class="h-full w-full object-contain"
+							onload={onPreviewLoad}
+							onerror={onPreviewError}
+						/>
+						{#if isTesting}
+							<div
+								class="absolute inset-0 flex items-center justify-center bg-black/60 text-sm text-muted-foreground"
+							>
+								<Loader2 class="mr-2 size-4 animate-spin" />
+								Connecting...
+							</div>
+						{/if}
 					{:else if isTesting}
-						<div class="animate-pulse text-sm text-muted-foreground">Connecting...</div>
+						<div class="flex items-center text-sm text-muted-foreground">
+							<Loader2 class="mr-2 size-4 animate-spin" />
+							Connecting...
+						</div>
 					{:else}
 						<div class="text-sm text-muted-foreground">
 							Enter a stream URL and click Test to preview
