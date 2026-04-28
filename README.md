@@ -23,7 +23,13 @@ Locus Vision is an **open-source, self-hosted video analytics platform** built f
 Whether you need a **computer vision dashboard** for retail foot traffic, a **local CCTV analytics** system for warehouses, or a **people counter** for any space, Locus Vision runs entirely on-device — including on a Raspberry Pi 5 with the Hailo-8L AI HAT.
 
 
-![Demo Screenshot 2](./assets/demo-2.png)
+### Live Monitoring & Detection
+
+![Real-time object detection with activity feed, zone counts, and model stats](./assets/demo-2.jpg)
+
+### Zone & Line Configuration
+
+![Visual editor for drawing polygon zones and directional crossing lines on a live camera preview](./assets/demo-1.jpg)
 
 ## Features
 
