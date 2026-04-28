@@ -8,7 +8,7 @@
 	import ToolsPanel from '$lib/components/create/tools-panel.svelte';
 	import type { Point, Zone } from '$lib/components/create/drawing-canvas.svelte';
 	import { pickZoneColor } from '$lib/zone-colors';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	import { videoStore } from '$lib/stores/video.svelte';
 
@@ -36,6 +36,30 @@
 	let selectedModel = $state<string>('yolo11n');
 	let confidenceThreshold = $state<number>(0.25);
 
+	// Drawing state lifted from canvas (for keyboard coordination)
+	let currentPoints = $state<Point[]>([]);
+	let isDrawing = $state(false);
+
+	// Undo history for committed zones
+	const HISTORY_LIMIT = 50;
+	let history = $state<Zone[][]>([]);
+
+	function pushHistory() {
+		const snapshot = zones.map((z) => ({ ...z, points: z.points.map((p) => ({ ...p })) }));
+		history = [...history, snapshot];
+		if (history.length > HISTORY_LIMIT) history = history.slice(-HISTORY_LIMIT);
+	}
+
+	function undo() {
+		if (history.length === 0) return;
+		const prev = history[history.length - 1];
+		history = history.slice(0, -1);
+		zones = prev;
+		if (selectedZoneId && !prev.some((z) => z.id === selectedZoneId)) {
+			selectedZoneId = null;
+		}
+	}
+
 	// Installed models from registry API
 	let installedModels = $state<
 		{ name: string; label: string; fps_estimate?: number | null; active_format?: string | null }[]
@@ -45,8 +69,8 @@
 	const defaultFps = $derived(videoStore.videoType === 'file' ? 12 : 24);
 	let fps = $state<number>(videoStore.videoType === 'file' ? 12 : 24);
 
-	onMount(async () => {
-		await fetchInstalledModels();
+	onMount(() => {
+		fetchInstalledModels();
 	});
 
 	async function fetchInstalledModels() {
@@ -69,6 +93,7 @@
 	}
 
 	function handleZoneCreated(points: Point[]) {
+		pushHistory();
 		const newZone: Zone = {
 			id: crypto.randomUUID(),
 			points: points,
@@ -83,14 +108,17 @@
 	}
 
 	function handleZoneRenamed(id: string, name: string) {
+		pushHistory();
 		zones = zones.map((z) => (z.id === id ? { ...z, name: name } : z));
 	}
 
 	function handleZoneClassesChanged(id: string, classes: string[]) {
+		pushHistory();
 		zones = zones.map((z) => (z.id === id ? { ...z, classes: classes } : z));
 	}
 
 	function handleZoneDirectionChanged(id: string, direction: 'both' | 'in' | 'out') {
+		pushHistory();
 		zones = zones.map((z) => (z.id === id ? { ...z, direction } : z));
 	}
 
@@ -98,17 +126,76 @@
 		selectedZoneId = id;
 	}
 
+	// History snapshot is taken in the canvas via onBeforeEdit at drag/insert start,
+	// so per-frame point updates don't push history.
 	function handleZoneUpdated(id: string, newPoints: Point[]) {
 		zones = zones.map((z) => (z.id === id ? { ...z, points: newPoints } : z));
 	}
 
-	function handleDeleteZone(id: string, e: MouseEvent) {
-		e.stopPropagation();
+	function deleteZoneById(id: string) {
+		pushHistory();
 		zones = zones.filter((z) => z.id !== id);
 		if (selectedZoneId === id) {
 			selectedZoneId = null;
 		}
 	}
+
+	function handleDeleteZone(id: string, e: MouseEvent) {
+		e.stopPropagation();
+		deleteZoneById(id);
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement | null;
+		if (
+			target &&
+			(target.tagName === 'INPUT' ||
+				target.tagName === 'TEXTAREA' ||
+				target.tagName === 'SELECT' ||
+				target.isContentEditable)
+		) {
+			return;
+		}
+
+		// Cmd/Ctrl+Z → undo
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+			e.preventDefault();
+			undo();
+			return;
+		}
+
+		// Esc → cancel in-progress drawing
+		if (e.key === 'Escape') {
+			if (currentPoints.length > 0 || isDrawing) {
+				e.preventDefault();
+				currentPoints = [];
+				isDrawing = false;
+			}
+			return;
+		}
+
+		// Backspace / Delete
+		if (e.key === 'Backspace' || e.key === 'Delete') {
+			if (currentPoints.length > 0) {
+				e.preventDefault();
+				currentPoints = currentPoints.slice(0, -1);
+				if (currentPoints.length === 0) isDrawing = false;
+			} else if (selectedZoneId) {
+				e.preventDefault();
+				deleteZoneById(selectedZoneId);
+			}
+		}
+	}
+
+	onMount(() => {
+		window.addEventListener('keydown', handleKeydown);
+	});
+
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('keydown', handleKeydown);
+		}
+	});
 
 	async function handleProcess(mode: 'zone-based' | 'full-frame') {
 		if (!videoStore.videoUrl && videoStore.videoType !== 'stream') {
@@ -206,8 +293,11 @@
 				onZoneCreated={handleZoneCreated}
 				onZoneSelected={handleZoneSelected}
 				onZoneUpdated={handleZoneUpdated}
+				onBeforeEdit={pushHistory}
 				bind:naturalWidth={videoNaturalWidth}
 				bind:naturalHeight={videoNaturalHeight}
+				bind:currentPoints
+				bind:isDrawing
 			/>
 		</Card.Root>
 

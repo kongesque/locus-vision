@@ -13,6 +13,7 @@
 		onZoneCreated: (points: Point[]) => void;
 		onZoneSelected: (id: string | null) => void;
 		onZoneUpdated: (id: string, newPoints: Point[]) => void;
+		onBeforeEdit?: () => void;
 	}
 
 	let {
@@ -23,8 +24,11 @@
 		drawingMode,
 		onZoneCreated,
 		onZoneSelected,
-		onZoneUpdated
-	}: Props = $props();
+		onZoneUpdated,
+		onBeforeEdit,
+		currentPoints = $bindable([]),
+		isDrawing = $bindable(false)
+	}: Props & { currentPoints?: Point[]; isDrawing?: boolean } = $props();
 
 	let containerRef: HTMLDivElement | undefined = $state();
 	let videoRef: HTMLVideoElement | undefined = $state();
@@ -246,6 +250,9 @@
 					{onZoneCreated}
 					{onZoneSelected}
 					{onZoneUpdated}
+					{onBeforeEdit}
+					bind:currentPoints
+					bind:isDrawing
 				/>
 			</div>
 		{/if}

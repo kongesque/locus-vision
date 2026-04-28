@@ -12,6 +12,7 @@
 		onZoneCreated: (points: Point[]) => void;
 		onZoneSelected: (id: string | null) => void;
 		onZoneUpdated: (id: string, newPoints: Point[]) => void;
+		onBeforeEdit?: () => void;
 	}
 
 	let {
@@ -22,9 +23,17 @@
 		onZoneCreated,
 		onZoneSelected,
 		onZoneUpdated,
+		onBeforeEdit,
 		naturalWidth = $bindable(0),
-		naturalHeight = $bindable(0)
-	}: Props & { naturalWidth?: number; naturalHeight?: number } = $props();
+		naturalHeight = $bindable(0),
+		currentPoints = $bindable([]),
+		isDrawing = $bindable(false)
+	}: Props & {
+		naturalWidth?: number;
+		naturalHeight?: number;
+		currentPoints?: Point[];
+		isDrawing?: boolean;
+	} = $props();
 
 	const videoState = useVideo();
 
@@ -123,6 +132,9 @@
 		{onZoneCreated}
 		{onZoneSelected}
 		{onZoneUpdated}
+		{onBeforeEdit}
+		bind:currentPoints
+		bind:isDrawing
 	/>
 {:else if !videoState?.videoUrl && !videoState?.videoStream}
 	<div class="flex h-full w-full items-center justify-center bg-black text-muted-foreground">
@@ -166,6 +178,9 @@
 					{onZoneCreated}
 					{onZoneSelected}
 					{onZoneUpdated}
+					{onBeforeEdit}
+					bind:currentPoints
+					bind:isDrawing
 				/>
 			</div>
 		{/if}

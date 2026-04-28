@@ -16,7 +16,6 @@
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { hexToRgba, pickZoneColor } from '$lib/zone-colors';
 
 	interface Props {
@@ -30,6 +29,9 @@
 		onZoneCreated: (points: Point[]) => void;
 		onZoneSelected: (id: string | null) => void;
 		onZoneUpdated: (id: string, newPoints: Point[]) => void;
+		onBeforeEdit?: () => void;
+		currentPoints?: Point[];
+		isDrawing?: boolean;
 	}
 
 	let {
@@ -42,14 +44,14 @@
 		drawingMode,
 		onZoneCreated,
 		onZoneSelected,
-		onZoneUpdated
+		onZoneUpdated,
+		onBeforeEdit,
+		currentPoints = $bindable([]),
+		isDrawing = $bindable(false)
 	}: Props = $props();
 
 	let canvas: HTMLCanvasElement | undefined = $state();
 
-	// Current drawing state (for NEW zone)
-	let currentPoints = $state<Point[]>([]);
-	let isDrawing = $state(false);
 	let currentMousePos = $state<Point | null>(null);
 
 	// Color the next-to-be-created zone will use (preview during drawing)
@@ -60,11 +62,13 @@
 	// Editing state
 	let draggingPointIndex = $state<number | null>(null);
 	let hoveredPointIndex = $state<number | null>(null);
+	let hoveredEdge = $state<{ edgeIndex: number; point: Point } | null>(null);
 
 	// Derived cursor style
 	let cursor = $derived.by(() => {
 		if (draggingPointIndex !== null) return 'cursor-grabbing';
 		if (hoveredPointIndex !== null) return 'cursor-grab';
+		if (hoveredEdge !== null) return 'cursor-copy';
 		if (selectedZoneId) return 'cursor-default';
 		return 'cursor-crosshair';
 	});
@@ -94,6 +98,38 @@
 			const dy = y - p.y;
 			return Math.sqrt(dx * dx + dy * dy) <= hitRadius;
 		});
+	}
+
+	function getEdgeUnderCursor(
+		x: number,
+		y: number,
+		zone: Zone
+	): { edgeIndex: number; point: Point } | null {
+		const hitRadius = 8 * (videoWidth / width);
+		const pts = zone.points;
+		if (pts.length < 2) return null;
+		const segmentCount = zone.type === 'polygon' ? pts.length : pts.length - 1;
+
+		for (let i = 0; i < segmentCount; i++) {
+			const a = pts[i];
+			const b = pts[(i + 1) % pts.length];
+			const dx = b.x - a.x;
+			const dy = b.y - a.y;
+			const lenSq = dx * dx + dy * dy;
+			if (lenSq === 0) continue;
+
+			let t = ((x - a.x) * dx + (y - a.y) * dy) / lenSq;
+			// Avoid inserting too close to existing endpoints
+			if (t < 0.1 || t > 0.9) continue;
+
+			const px = a.x + t * dx;
+			const py = a.y + t * dy;
+			const dist = Math.sqrt((x - px) * (x - px) + (y - py) * (y - py));
+			if (dist <= hitRadius) {
+				return { edgeIndex: i, point: { x: px, y: py } };
+			}
+		}
+		return null;
 	}
 
 	function isPointInPolygon(x: number, y: number, points: Point[]) {
@@ -213,6 +249,7 @@
 			// Draw vertices ONLY for selected zone
 			if (isSelected) {
 				ctx.lineWidth = scale; // Thin border for handles
+				ctx.strokeStyle = zoneColor;
 
 				zone.points.forEach((point, index) => {
 					const isHovered = hoveredPointIndex === index;
@@ -224,6 +261,17 @@
 					ctx.fill();
 					ctx.stroke();
 				});
+
+				// Ghost dot indicating where a new vertex would be inserted
+				if (hoveredEdge && draggingPointIndex === null) {
+					ctx.beginPath();
+					ctx.arc(hoveredEdge.point.x, hoveredEdge.point.y, handleSize / 2, 0, 2 * Math.PI);
+					ctx.fillStyle = hexToRgba(zoneColor, 0.6);
+					ctx.fill();
+					ctx.strokeStyle = '#ffffff';
+					ctx.lineWidth = scale;
+					ctx.stroke();
+				}
 			}
 		});
 
@@ -352,7 +400,20 @@
 			if (selectedZone) {
 				const pointIndex = getPointUnderCursor(x, y, selectedZone.points);
 				if (pointIndex !== -1) {
+					onBeforeEdit?.();
 					draggingPointIndex = pointIndex;
+					return;
+				}
+
+				// 1b. Check if clicking on an edge -> insert new vertex and start dragging it
+				const edge = getEdgeUnderCursor(x, y, selectedZone);
+				if (edge) {
+					onBeforeEdit?.();
+					const newPoints = [...selectedZone.points];
+					newPoints.splice(edge.edgeIndex + 1, 0, edge.point);
+					onZoneUpdated(selectedZoneId, newPoints);
+					draggingPointIndex = edge.edgeIndex + 1;
+					hoveredEdge = null;
 					return;
 				}
 			}
@@ -392,15 +453,17 @@
 			return;
 		}
 
-		// Check for hover over vertices if a zone is selected
-		if (selectedZoneId) {
+		// Check for hover over vertices / edges if a zone is selected
+		if (selectedZoneId && !isDrawing && currentPoints.length === 0) {
 			const selectedZone = zones.find((z) => z.id === selectedZoneId);
 			if (selectedZone) {
 				const pointIndex = getPointUnderCursor(x, y, selectedZone.points);
 				hoveredPointIndex = pointIndex !== -1 ? pointIndex : null;
+				hoveredEdge = pointIndex === -1 ? getEdgeUnderCursor(x, y, selectedZone) : null;
 			}
 		} else {
 			hoveredPointIndex = null;
+			hoveredEdge = null;
 		}
 
 		// Just update mouse pos for elastic line
