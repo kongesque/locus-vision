@@ -10,7 +10,9 @@ import os
 import cv2
 import time
 import json
+import shutil
 import sqlite3
+import subprocess
 import threading
 from datetime import datetime
 from typing import Optional
@@ -20,6 +22,43 @@ from config import settings
 
 CACHE_DIR = "data/videos"
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+def _make_browser_playable_mp4(source_path: str, output_path: str) -> None:
+    """Transcode OpenCV output to H.264 MP4 for browser video players."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to create browser-playable result videos")
+
+    tmp_output_path = f"{output_path}.h264.tmp.mp4"
+    command = [
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        source_path,
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        tmp_output_path,
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        if os.path.exists(tmp_output_path):
+            os.remove(tmp_output_path)
+        detail = (result.stderr or result.stdout or "ffmpeg returned a non-zero exit code").strip()
+        raise RuntimeError(f"Failed to create browser-playable result video: {detail}")
+
+    os.replace(tmp_output_path, output_path)
 
 
 def _dict_factory(cursor, row):
@@ -176,7 +215,11 @@ class VideoJobQueue:
         task_id = task["id"]
         input_path = os.path.join(CACHE_DIR, f"input_{task_id}.mp4")
         output_path = os.path.join(CACHE_DIR, f"output_{task_id}.mp4")
+        raw_output_path = os.path.join(CACHE_DIR, f"output_{task_id}.raw.mp4")
         model_name = task.get("model_name") or "yolo11n"
+        for stale_path in (output_path, raw_output_path, f"{output_path}.h264.tmp.mp4"):
+            if os.path.exists(stale_path):
+                os.remove(stale_path)
 
         zones_raw = task.get("zones") or "[]"
         zones = json.loads(zones_raw) if isinstance(zones_raw, str) else zones_raw
@@ -221,8 +264,12 @@ class VideoJobQueue:
             new_fps = min(fps, target_fps)
             skip_interval = max(1, int(fps / new_fps))
 
-            fourcc = cv2.VideoWriter_fourcc(*"avc1")
-            out = cv2.VideoWriter(output_path, fourcc, new_fps, (width, height))
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            out = cv2.VideoWriter(raw_output_path, fourcc, new_fps, (width, height))
+            if not out.isOpened():
+                self._fail_task(task_id, "Cannot open output video writer")
+                cap.release()
+                return
 
             analytical_data = {
                 "task_id": task_id,
@@ -298,6 +345,9 @@ class VideoJobQueue:
 
             cap.release()
             out.release()
+            _make_browser_playable_mp4(raw_output_path, output_path)
+            if os.path.exists(raw_output_path):
+                os.remove(raw_output_path)
             
             # End of video loop, flush remaining
             # Force GC to emit exit events for active tracks at the end
