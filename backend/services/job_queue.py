@@ -10,7 +10,9 @@ import os
 import cv2
 import time
 import json
+import shutil
 import sqlite3
+import subprocess
 import threading
 from datetime import datetime
 from typing import Optional
@@ -20,9 +22,78 @@ from config import settings
 
 CACHE_DIR = "data/videos"
 os.makedirs(CACHE_DIR, exist_ok=True)
+FFMPEG_TRANSCODE_TIMEOUT_SECONDS = int(os.getenv("FFMPEG_TRANSCODE_TIMEOUT_SECONDS", "900"))
+H264_TMP_SUFFIX = ".h264.tmp.mp4"
+
+
+def _browser_playable_temp_path(output_path: str) -> str:
+    """Return the temporary path used while transcoding browser-playable MP4s."""
+    return f"{output_path}{H264_TMP_SUFFIX}"
+
+
+def _remove_files(paths) -> None:
+    """Best-effort cleanup for transient video files."""
+    for path in paths:
+        if not path or not os.path.exists(path):
+            continue
+        try:
+            os.remove(path)
+        except OSError as exc:
+            print(f"[JobQueue] Could not remove temporary file {path}: {exc}")
+
+
+def _make_browser_playable_mp4(source_path: str, output_path: str) -> None:
+    """Transcode OpenCV output to H.264 MP4 for browser video players."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to create browser-playable result videos")
+
+    tmp_output_path = _browser_playable_temp_path(output_path)
+    command = [
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        source_path,
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        tmp_output_path,
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=FFMPEG_TRANSCODE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        _remove_files((tmp_output_path,))
+        raise RuntimeError(
+            "Timed out while creating browser-playable result video "
+            f"after {FFMPEG_TRANSCODE_TIMEOUT_SECONDS} seconds"
+        ) from exc
+
+    if result.returncode != 0:
+        _remove_files((tmp_output_path,))
+        detail = (result.stderr or result.stdout or "ffmpeg returned a non-zero exit code").strip()
+        raise RuntimeError(f"Failed to create browser-playable result video: {detail}")
+
+    os.replace(tmp_output_path, output_path)
 
 
 def _dict_factory(cursor, row):
+    """Convert sqlite rows into dictionaries keyed by column name."""
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
 
 
@@ -173,10 +244,14 @@ class VideoJobQueue:
             self._current_task_id = None
 
     def _process_task(self, task: dict):
+        """Run a queued video task and persist its processed output."""
         task_id = task["id"]
         input_path = os.path.join(CACHE_DIR, f"input_{task_id}.mp4")
         output_path = os.path.join(CACHE_DIR, f"output_{task_id}.mp4")
+        raw_output_path = os.path.join(CACHE_DIR, f"output_{task_id}.raw.mp4")
         model_name = task.get("model_name") or "yolo11n"
+        temp_output_path = _browser_playable_temp_path(output_path)
+        _remove_files((output_path, raw_output_path, temp_output_path))
 
         zones_raw = task.get("zones") or "[]"
         zones = json.loads(zones_raw) if isinstance(zones_raw, str) else zones_raw
@@ -189,6 +264,8 @@ class VideoJobQueue:
 
         print(f"[JobQueue] Processing task {task_id} ({task.get('filename', '?')})")
 
+        cap = None
+        out = None
         try:
             engine = AnalyticsEngine(
                 model_name=model_name,
@@ -221,8 +298,13 @@ class VideoJobQueue:
             new_fps = min(fps, target_fps)
             skip_interval = max(1, int(fps / new_fps))
 
-            fourcc = cv2.VideoWriter_fourcc(*"avc1")
-            out = cv2.VideoWriter(output_path, fourcc, new_fps, (width, height))
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            out = cv2.VideoWriter(raw_output_path, fourcc, new_fps, (width, height))
+            if not out.isOpened():
+                self._fail_task(task_id, "Cannot open output video writer")
+                cap.release()
+                _remove_files((raw_output_path, temp_output_path))
+                return
 
             analytical_data = {
                 "task_id": task_id,
@@ -298,6 +380,9 @@ class VideoJobQueue:
 
             cap.release()
             out.release()
+            _make_browser_playable_mp4(raw_output_path, output_path)
+            if os.path.exists(raw_output_path):
+                os.remove(raw_output_path)
             
             # End of video loop, flush remaining
             # Force GC to emit exit events for active tracks at the end
@@ -343,8 +428,13 @@ class VideoJobQueue:
             self._complete_task(task_id, duration_str, final_count, final_zone_counts)
 
         except Exception as e:
+            if cap is not None:
+                cap.release()
+            if out is not None:
+                out.release()
             print(f"[JobQueue] Task {task_id} failed: {e}")
             self._fail_task(task_id, str(e))
+            _remove_files((raw_output_path, temp_output_path))
 
 
 job_queue = VideoJobQueue()
