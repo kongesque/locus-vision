@@ -482,7 +482,6 @@
 </script>
 
 <div class="absolute top-0 left-0" style="width: {width}px; height: {height}px;">
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<canvas
 		bind:this={canvas}
 		style="width: 100%; height: 100%;"

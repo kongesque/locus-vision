@@ -1,6 +1,7 @@
 import os
 import glob
 import logging
+import re
 import tempfile
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
@@ -325,6 +326,9 @@ async def delete_model(model_name: str, request: Request):
     then deletes any that exist on disk. Also removes any files
     matching the model name pattern as a fallback.
     """
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", model_name):
+        raise HTTPException(status_code=400, detail="Invalid model name")
+
     catalog = getattr(request.app.state, "model_catalog", None)
     deleted_files: list[str] = []
 

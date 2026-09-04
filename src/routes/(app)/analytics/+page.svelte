@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { API_URL } from '$lib/api';
+	import { API_URL, apiFetch } from '$lib/api';
 	import {
 		Activity,
 		Download,
@@ -78,8 +78,8 @@
 			const endIso = end.toISOString();
 
 			// 1. Fetch Aggregated Data
-			const resExport = await fetch(
-				`${API_URL}/api/analytics/export?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}&format=json`
+			const resExport = await apiFetch(
+				`/api/analytics/export?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}&format=json`
 			);
 			if (resExport.ok) {
 				const json = await resExport.json();
@@ -87,8 +87,8 @@
 			}
 
 			// 2. Fetch Heatmap Data
-			const resHeatmap = await fetch(
-				`${API_URL}/api/analytics/heatmap?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}`
+			const resHeatmap = await apiFetch(
+				`/api/analytics/heatmap?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}`
 			);
 			if (resHeatmap.ok) {
 				const json = await resHeatmap.json();
@@ -97,8 +97,8 @@
 			}
 
 			// 3. Fetch Peak Hours Data
-			const resPeak = await fetch(
-				`${API_URL}/api/analytics/peak-hours?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}`
+			const resPeak = await apiFetch(
+				`/api/analytics/peak-hours?camera_id=${selectedCamera}&start_time=${startIso}&end_time=${endIso}`
 			);
 			if (resPeak.ok) {
 				peakHoursData = await resPeak.json();
@@ -193,7 +193,10 @@
 				disabled={data.cameras?.length === 0}
 			>
 				<Select.Trigger class="w-[200px] cursor-pointer">
-					{data.cameras?.find((c: { id: string; name?: string }) => c.id === selectedCamera)?.name || selectedCamera || 'Select camera'}
+					{data.cameras?.find((c: { id: string; name?: string }) => c.id === selectedCamera)
+						?.name ||
+						selectedCamera ||
+						'Select camera'}
 				</Select.Trigger>
 				<Select.Content>
 					{#if data.cameras?.length === 0}
@@ -219,18 +222,18 @@
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger
 					disabled={!selectedCamera || isLoading}
-					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium whitespace-nowrap text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+					class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium whitespace-nowrap text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
 				>
 					<Download class="h-4 w-4" />
 					Export
 					<ChevronDown class="h-3 w-3 opacity-70" />
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="end" class="w-40">
-					<DropdownMenu.Item onclick={() => handleDownload('csv')} class="gap-2 cursor-pointer">
+					<DropdownMenu.Item onclick={() => handleDownload('csv')} class="cursor-pointer gap-2">
 						<Download class="size-3.5" />
 						Export as CSV
 					</DropdownMenu.Item>
-					<DropdownMenu.Item onclick={() => handleDownload('json')} class="gap-2 cursor-pointer">
+					<DropdownMenu.Item onclick={() => handleDownload('json')} class="cursor-pointer gap-2">
 						<Download class="size-3.5" />
 						Export as JSON
 					</DropdownMenu.Item>
@@ -306,7 +309,7 @@
 		<!-- Peak Hours Chart -->
 		<div class="rounded-xl border bg-card text-card-foreground shadow">
 			<div class="flex flex-col space-y-1.5 border-b p-4">
-				<h3 class="flex items-center gap-2 text-sm font-semibold leading-none tracking-tight">
+				<h3 class="flex items-center gap-2 text-sm leading-none font-semibold tracking-tight">
 					<TrendingUp class="h-4 w-4 text-amber-500" /> Peak Hours Distribution
 				</h3>
 				<p class="text-xs text-muted-foreground">Zone traffic by hour of day</p>
@@ -365,7 +368,7 @@
 			<!-- Heatmap / Spaghetti Map -->
 			<div class="col-span-1 flex flex-col rounded-xl border bg-card text-card-foreground shadow">
 				<div class="flex flex-col space-y-1.5 border-b p-4">
-					<h3 class="flex items-center gap-2 text-sm font-semibold leading-none tracking-tight">
+					<h3 class="flex items-center gap-2 text-sm leading-none font-semibold tracking-tight">
 						<Map class="h-4 w-4 text-blue-500" /> Movement Heatmap
 					</h3>
 				</div>
@@ -394,7 +397,7 @@
 			<!-- Aggregated List -->
 			<div class="col-span-1 rounded-xl border bg-card text-card-foreground shadow">
 				<div class="flex flex-col space-y-1.5 border-b p-4">
-					<h3 class="flex items-center gap-2 text-sm font-semibold leading-none tracking-tight">
+					<h3 class="flex items-center gap-2 text-sm leading-none font-semibold tracking-tight">
 						<Calendar class="h-4 w-4 text-purple-500" /> Hourly Zone Telemetry
 					</h3>
 					<p class="text-xs text-muted-foreground">Recent data buckets</p>

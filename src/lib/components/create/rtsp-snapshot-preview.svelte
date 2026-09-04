@@ -210,7 +210,6 @@
 		{/if}
 
 		<!-- Native video playback — full FPS, hardware decoded (or MJPEG stream proxy) -->
-		<!-- svelte-ignore a11y_media_has_caption -->
 		{#if isHlsUrl(url)}
 			<video
 				bind:this={videoRef}
@@ -228,8 +227,10 @@
 				src={`${API_URL}/api/cameras/${cameraId}/preview-stream`}
 				alt="Camera preview"
 				class="pointer-events-none max-h-full max-w-full object-contain"
-				onerror={() => { isLoading = false; error = 'Failed to connect to camera'; }}
-				crossorigin="anonymous"
+				onerror={() => {
+					isLoading = false;
+					error = 'Failed to connect to camera';
+				}}
 			/>
 		{/if}
 

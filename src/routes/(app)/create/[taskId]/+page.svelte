@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { API_URL } from '$lib/api';
+	import { apiFetch } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { setVideoContext } from '$lib/stores/video-store.svelte';
 	import * as Card from '$lib/components/ui/card';
@@ -24,10 +24,8 @@
 	});
 
 	// State
-	let isProcessing = $state(false);
 	let videoNaturalWidth = $state(1920);
 	let videoNaturalHeight = $state(1080);
-	let errorMsg = $state<string | null>(null);
 
 	let zones = $state<Zone[]>([]);
 	let selectedZoneId = $state<string | null>(null);
@@ -66,7 +64,6 @@
 	>([]);
 
 	// FPS: default depends on flow type (12 = video analytics, 24 = livestream)
-	const defaultFps = $derived(videoStore.videoType === 'file' ? 12 : 24);
 	let fps = $state<number>(videoStore.videoType === 'file' ? 12 : 24);
 
 	onMount(() => {
@@ -75,7 +72,7 @@
 
 	async function fetchInstalledModels() {
 		try {
-			const res = await fetch(`${API_URL}/api/models/registry`);
+			const res = await apiFetch('/api/models/registry');
 			if (res.ok) {
 				const data = await res.json();
 				installedModels = (data.models ?? []).filter((m: any) => m.installed);
@@ -228,7 +225,7 @@
 			formData.append('fps', String(fps));
 			formData.append('confidence_threshold', String(confidenceThreshold));
 
-			fetch(`${API_URL}/api/video/${taskId}/process`, {
+			apiFetch(`/api/video/${taskId}/process`, {
 				method: 'POST',
 				body: formData
 			}).catch((err) => console.error('Upload failed:', err));
@@ -249,7 +246,7 @@
 					new Set([...finalGlobalClasses, ...finalZones.flatMap((z) => z.classes || [])])
 				);
 
-				const response = await fetch(`${API_URL}/api/cameras/${taskId}`, {
+				const response = await apiFetch(`/api/cameras/${taskId}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({

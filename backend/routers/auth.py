@@ -14,6 +14,7 @@ from auth import (
     decode_refresh_token,
 )
 from database import get_db, has_users, get_app_setting
+from config import settings
 from models import (
     UserCreate,
     UserLogin,
@@ -52,13 +53,15 @@ def _record_attempt(ip: str):
 # ── Dependencies ─────────────────────────────────────────
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ):
-    """Extract and validate the current user from Bearer token."""
-    if not credentials:
+    """Extract and validate the current user from a bearer token or HttpOnly cookie."""
+    token = credentials.credentials if credentials else request.cookies.get("access_token")
+    if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
@@ -182,7 +185,11 @@ async def login(data: UserLogin, request: Request):
     client_ip = request.client.host if request.client else "unknown"
 
     # Rate limiting
-    if not _check_rate_limit(client_ip):
+    if not _check_rate_limit(
+        client_ip,
+        max_attempts=settings.login_max_attempts,
+        window=settings.login_lockout_seconds,
+    ):
         raise HTTPException(
             status_code=429,
             detail="Too many login attempts. Please try again later.",
@@ -205,6 +212,7 @@ async def login(data: UserLogin, request: Request):
 
         user_id = user[0]
         role = user[4]
+        _login_attempts.pop(client_ip, None)
 
         # Rehash password if Argon2 params have changed
         if needs_rehash(user[3]):
@@ -223,8 +231,8 @@ async def login(data: UserLogin, request: Request):
         refresh_hash = hash_password(refresh_token)
         await db.execute(
             """INSERT INTO sessions (user_id, refresh_token_hash, expires_at)
-               VALUES (?, ?, datetime('now', '+7 days'))""",
-            (user_id, refresh_hash),
+               VALUES (?, ?, datetime('now', ?))""",
+            (user_id, refresh_hash, f"+{settings.refresh_token_expire_days} days"),
         )
         await db.commit()
 
@@ -257,17 +265,35 @@ async def refresh_token(request: Request):
         if not user or not user[2]:
             raise HTTPException(status_code=401, detail="User not found or inactive")
 
+        # A signed refresh token is not enough: it must still belong to an
+        # active server-side session so logout/revocation takes effect.
+        await db.execute(
+            "DELETE FROM sessions WHERE user_id = ? AND expires_at <= datetime('now')",
+            (user_id,),
+        )
+        cursor = await db.execute(
+            "SELECT id, refresh_token_hash FROM sessions WHERE user_id = ?",
+            (user_id,),
+        )
+        sessions = await cursor.fetchall()
+        session_id = next(
+            (session[0] for session in sessions if verify_password(token, session[1])),
+            None,
+        )
+        if session_id is None:
+            raise HTTPException(status_code=401, detail="Refresh session is no longer active")
+
         # Create new tokens (rotation)
         new_access = create_access_token(user[0], user[1])
         new_refresh = create_refresh_token(user[0])
 
-        # Clean old sessions and store new one
-        await db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        # Rotate only the matching session, preserving other signed-in devices.
+        await db.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         refresh_hash = hash_password(new_refresh)
         await db.execute(
             """INSERT INTO sessions (user_id, refresh_token_hash, expires_at)
-               VALUES (?, ?, datetime('now', '+7 days'))""",
-            (user_id, refresh_hash),
+               VALUES (?, ?, datetime('now', ?))""",
+            (user_id, refresh_hash, f"+{settings.refresh_token_expire_days} days"),
         )
         await db.commit()
 
@@ -292,4 +318,3 @@ async def logout(current_user: dict = Depends(get_current_user)):
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Get current authenticated user info."""
     return UserResponse(**current_user)
-

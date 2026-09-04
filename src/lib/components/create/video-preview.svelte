@@ -145,7 +145,6 @@
 		bind:this={containerRef}
 		class="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg bg-black"
 	>
-		<!-- svelte-ignore a11y_media_has_caption -->
 		<video
 			bind:this={videoRef}
 			class="pointer-events-none max-h-full max-w-full object-contain"
@@ -153,7 +152,6 @@
 			loop
 			muted
 			playsinline
-			crossorigin="anonymous"
 		>
 			{#if videoState?.videoType === 'file'}
 				<source src={videoState.videoUrl || ''} type="video/mp4" />

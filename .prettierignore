@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+/output/
+/tmp/
+/.claude/

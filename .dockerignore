@@ -4,6 +4,9 @@ build
 dist
 .git
 .DS_Store
+output
+tmp
+.claude
 
 # Backend runtime data (lives in Docker volume)
 backend/data/locusvision.db

@@ -15,7 +15,7 @@ if not (MIN_PYTHON <= sys.version_info[:2] <= MAX_PYTHON):
     )
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
@@ -29,6 +29,7 @@ from routers.system import router as system_router
 from routers.metrics import router as metrics_router
 from routers.analytics import router as analytics_router
 from routers.models import router as models_router
+from routers.auth import get_current_user
 
 from services.job_queue import job_queue
 from services.metrics_collector import metrics_collector
@@ -66,7 +67,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.1.0-beta.1",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -77,7 +78,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=".*",
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,13 +87,15 @@ app.add_middleware(
 # Mount routers
 app.include_router(auth_router)
 app.include_router(settings_router)
-app.include_router(video_router)
-app.include_router(livestream_router)
-app.include_router(cameras_router)
-app.include_router(system_router)
+authenticated = [Depends(get_current_user)]
+
+app.include_router(video_router, dependencies=authenticated)
+app.include_router(livestream_router, dependencies=authenticated)
+app.include_router(cameras_router, dependencies=authenticated)
+app.include_router(system_router, dependencies=authenticated)
 app.include_router(metrics_router)
-app.include_router(analytics_router)
-app.include_router(models_router)
+app.include_router(analytics_router, dependencies=authenticated)
+app.include_router(models_router, dependencies=authenticated)
 
 
 @app.get("/api/health")

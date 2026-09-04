@@ -9,8 +9,23 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from main import app
+from routers.auth import get_current_user
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_user():
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": 1,
+        "email": "test@example.com",
+        "name": "Test User",
+        "role": "admin",
+        "is_active": True,
+        "created_at": "2026-09-04 00:00:00",
+    }
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
 
 def test_camera_snapshot_success():
     """Test successful capture of a JPEG frame from a camera."""

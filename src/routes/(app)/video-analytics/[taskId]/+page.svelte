@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { API_URL } from '$lib/api';
+	import { API_URL, apiFetch } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
@@ -28,7 +27,6 @@
 		SkipForward,
 		Settings,
 		Trash2,
-		MoreVertical,
 		Check
 	} from '@lucide/svelte';
 	import { onMount, onDestroy } from 'svelte';
@@ -121,7 +119,7 @@
 
 	async function fetchTimelineData() {
 		try {
-			const res = await fetch(`${API_URL}/api/video/${taskId}/data`);
+			const res = await apiFetch(`/api/video/${taskId}/data`);
 			if (!res.ok) return;
 			const json = await res.json();
 			if (json.frames && Array.isArray(json.frames)) {
@@ -351,7 +349,7 @@
 	async function deleteTask() {
 		try {
 			isDeleting = true;
-			const res = await fetch(`${API_URL}/api/video/${taskId}`, {
+			const res = await apiFetch(`/api/video/${taskId}`, {
 				method: 'DELETE'
 			});
 			if (res.ok) {
@@ -372,7 +370,7 @@
 	async function saveSettings() {
 		try {
 			isSaving = true;
-			const res = await fetch(`${API_URL}/api/video/${taskId}`, {
+			const res = await apiFetch(`/api/video/${taskId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -399,7 +397,7 @@
 	async function checkStatus() {
 		if (status === 'ready') return;
 		try {
-			const res = await fetch(`${API_URL}/api/video/${taskId}/status`);
+			const res = await apiFetch(`/api/video/${taskId}/status`);
 			if (res.ok) {
 				const data = await res.json();
 				if (data.status === 'completed') {
@@ -658,7 +656,6 @@
 						autoplay
 						loop
 						playsinline
-						crossorigin="anonymous"
 						ontimeupdate={() => {
 							if (videoEl) {
 								currentVideoTime = videoEl.currentTime;
@@ -915,8 +912,7 @@
 													style="background-color: {meta.color};"
 												></div>
 												<span class="truncate text-sm" title={meta.name || zoneId}>
-													{meta.name ||
-														(zoneId.length > 8 ? `Zone ${zoneId.slice(0, 4)}` : zoneId)}
+													{meta.name || (zoneId.length > 8 ? `Zone ${zoneId.slice(0, 4)}` : zoneId)}
 												</span>
 											</div>
 											<span class="font-mono text-lg font-bold">{count}</span>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { API_URL } from '$lib/api';
 	import { fade } from 'svelte/transition';
 	import EchoLoader from '$lib/components/echo-loader.svelte';
@@ -80,6 +80,12 @@
 		md: 'bottom-1 left-2',
 		lg: 'bottom-3 left-3'
 	};
+
+	function handleStreamError(event: Event) {
+		const image = event.currentTarget as HTMLImageElement;
+		image.onerror = null;
+		image.src = thumbnail;
+	}
 </script>
 
 <!-- Mock link to UI -->
@@ -91,6 +97,7 @@
 		<img
 			src={`${API_URL}/api/livestream/${cameraId}/video`}
 			alt={title}
+			onerror={handleStreamError}
 			class="aspect-video w-full object-cover transition-opacity duration-300 group-hover:opacity-80"
 		/>
 

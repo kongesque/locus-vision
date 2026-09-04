@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { API_URL } from '$lib/api';
+	import { API_URL, apiFetch } from '$lib/api';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -40,7 +40,7 @@
 	async function runDiscovery() {
 		try {
 			isDiscovering = true;
-			const response = await fetch(`${API_URL}/api/cameras/discover`);
+			const response = await apiFetch('/api/cameras/discover');
 			if (!response.ok) throw new Error('Discovery failed');
 			discoveredCameras = await response.json();
 		} catch (err) {
@@ -139,7 +139,7 @@
 				};
 			}
 
-			const response = await fetch(`${API_URL}/api/cameras`, {
+			const response = await apiFetch('/api/cameras', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(config)
@@ -179,7 +179,9 @@
 	<Dialog.Content class="sm:max-w-[500px]">
 		<Dialog.Header>
 			<Dialog.Title>Add Camera</Dialog.Title>
-			<Dialog.Description>Connect via automatic discovery or manual configuration.</Dialog.Description>
+			<Dialog.Description
+				>Connect via automatic discovery or manual configuration.</Dialog.Description
+			>
 		</Dialog.Header>
 
 		<Tabs.Root bind:value={activeTab} class="w-full">
@@ -251,9 +253,7 @@
 					{#if previewUrl}
 						<img src={previewUrl} alt="Camera preview" class="h-full w-full object-contain" />
 					{:else}
-						<div class="text-sm text-muted-foreground">
-							Select a camera to preview
-						</div>
+						<div class="text-sm text-muted-foreground">Select a camera to preview</div>
 					{/if}
 				</div>
 			</Tabs.Content>

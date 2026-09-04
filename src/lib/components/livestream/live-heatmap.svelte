@@ -61,7 +61,6 @@
 			return;
 		}
 
-		const now = performance.now(); // or Date.now(), assuming points use Date.now()
 		// Let's assume points.timestamp is standard Date.now() timestamp from backend / frontend
 		const currentTimestamp = Date.now();
 

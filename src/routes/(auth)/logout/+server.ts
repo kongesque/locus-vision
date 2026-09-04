@@ -1,7 +1,6 @@
 import { redirect } from '@sveltejs/kit';
+import { API_BASE } from '$lib/server/api';
 import type { RequestHandler } from './$types';
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 export const POST: RequestHandler = async ({ cookies }) => {
     const accessToken = cookies.get('access_token');

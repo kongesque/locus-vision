@@ -3,7 +3,6 @@
 	import { useSidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import { cn } from '$lib/utils.js';
 	import PageTitle from '$lib/components/page-title-1.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 
 	let {
 		class: className = undefined

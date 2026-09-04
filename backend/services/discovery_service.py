@@ -43,7 +43,7 @@ class DiscoveryService:
                     lines = section.split('\n')
                     if not lines:
                         continue
-                    label = lines[0].strip()
+                    label = lines[0].strip().rstrip(':')
                     for line in lines[1:]:
                         if '/dev/video' in line:
                             dev_path = line.strip().split(' ')[0]

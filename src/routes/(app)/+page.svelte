@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { API_URL } from '$lib/api';
+	import { apiFetch } from '$lib/api';
 	import {
 		Cpu,
 		MemoryStick,
@@ -96,9 +96,9 @@
 	async function fetchAll() {
 		try {
 			const [sysRes, histRes, queueRes] = await Promise.allSettled([
-				fetch(`${API_URL}/api/system/stats`),
-				fetch(`${API_URL}/api/video/history`),
-				fetch(`${API_URL}/api/video/queue/status`)
+				apiFetch('/api/system/stats'),
+				apiFetch('/api/video/history'),
+				apiFetch('/api/video/queue/status')
 			]);
 
 			if (sysRes.status === 'fulfilled' && sysRes.value.ok) {
@@ -111,7 +111,7 @@
 				queueStatus = await queueRes.value.json();
 			}
 			error = null;
-		} catch (e) {
+		} catch {
 			error = 'Unable to connect to backend.';
 		}
 	}
@@ -206,7 +206,7 @@
 	{#if !stats}
 		<!-- Loading skeleton -->
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-			{#each Array(4) as _, i (i)}
+			{#each [0, 1, 2, 3] as i (i)}
 				<div class="h-[120px] animate-pulse rounded-xl border bg-muted/30"></div>
 			{/each}
 		</div>
@@ -463,7 +463,11 @@
 					</div>
 				</Card.Header>
 				<Card.Content class="flex flex-1 flex-col gap-2">
-					<Button variant="outline" class="w-full justify-start gap-2 cursor-pointer" onclick={openAddCameraDialog}>
+					<Button
+						variant="outline"
+						class="w-full cursor-pointer justify-start gap-2"
+						onclick={openAddCameraDialog}
+					>
 						<Plus class="h-4 w-4" />
 						New Camera Stream
 					</Button>
@@ -504,7 +508,11 @@
 					</div>
 				</div>
 				<a href="/video-analytics">
-					<Button variant="ghost" size="sm" class="gap-1 text-xs text-muted-foreground cursor-pointer">
+					<Button
+						variant="ghost"
+						size="sm"
+						class="cursor-pointer gap-1 text-xs text-muted-foreground"
+					>
 						View all
 						<ArrowRight class="h-3 w-3" />
 					</Button>
@@ -517,7 +525,7 @@
 							{@const StatusIcon = taskStatusIcon(task.status)}
 							<a
 								href="/video-analytics/{task.id}"
-								class="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50 cursor-pointer"
+								class="group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
 							>
 								<StatusIcon class="h-4 w-4 shrink-0 {taskStatusColor(task.status)}" />
 								<div class="flex min-w-0 flex-1 items-center justify-between gap-2">

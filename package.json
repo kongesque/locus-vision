@@ -1,8 +1,12 @@
 {
 	"name": "locusvision",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.0-beta.1",
 	"type": "module",
+	"packageManager": "pnpm@10.28.2",
+	"engines": {
+		"node": ">=22"
+	},
 	"scripts": {
 		"dev": "concurrently \"pnpm run dev:frontend\" \"pnpm run dev:backend\" --kill-others --prefix-colors \"bgBlue.bold,bgMagenta.bold\"",
 		"dev:frontend": "vite dev",
@@ -12,7 +16,8 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "prettier --check . && eslint .",
+		"lint": "eslint .",
+		"format:check": "prettier --check .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",

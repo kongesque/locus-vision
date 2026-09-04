@@ -2,13 +2,13 @@ services:
   locusvision:
     build: .
     ports:
-      - "8000:8000" # Backend API
-      - "3000:3000" # Frontend
+      - '8000:8000' # Backend API
+      - '3000:3000' # Frontend
     volumes:
       - locusvision-data:/app/backend/data
-      - /dev:/dev     # Auto-detect USB webcams + RTSP works out of the box
+      - /dev:/dev # Auto-detect USB webcams + RTSP works out of the box
     device_cgroup_rules:
-      - "c 81:* rmw"  # Allow video4linux devices
+      - 'c 81:* rmw' # Allow video4linux devices
     group_add:
       - video
     environment:
@@ -16,6 +16,7 @@ services:
       # Override here only if you need a stable secret (e.g. multi-replica setups).
       # - LOCUS_JWT_SECRET=your-secret-here
       - PORT=3000
+      - ORIGIN=${ORIGIN:-http://localhost:3000}
     restart: unless-stopped
 
 volumes:

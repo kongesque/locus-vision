@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { API_URL } from '$lib/api';
+	import { API_URL, apiFetch } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		ChevronLeft,
 		Maximize,
 		Minimize,
-		Camera,
 		Settings,
 		Shield,
 		HardDrive,
@@ -23,7 +22,6 @@
 	} from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import LiveHeatmap from '$lib/components/livestream/live-heatmap.svelte';
@@ -71,7 +69,7 @@
 	// Fetch camera details from backend
 	async function fetchCameraInfo() {
 		try {
-			const res = await fetch(`${API_URL}/api/cameras/${taskId}`);
+			const res = await apiFetch(`/api/cameras/${taskId}`);
 			if (res.ok) {
 				const data = await res.json();
 				cameraName = data.name;
@@ -110,7 +108,7 @@
 				errorMsg = 'Camera not found';
 				cameraStatus = 'error';
 			}
-		} catch (err) {
+		} catch {
 			errorMsg = 'Failed to connect to backend';
 			cameraStatus = 'error';
 		}
@@ -119,7 +117,7 @@
 	async function saveSettings() {
 		try {
 			isSaving = true;
-			const res = await fetch(`${API_URL}/api/cameras/${taskId}`, {
+			const res = await apiFetch(`/api/cameras/${taskId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -144,7 +142,7 @@
 	async function deleteCamera() {
 		try {
 			isDeleting = true;
-			const res = await fetch(`${API_URL}/api/cameras/${taskId}`, {
+			const res = await apiFetch(`/api/cameras/${taskId}`, {
 				method: 'DELETE'
 			});
 			if (res.ok) {
@@ -215,7 +213,9 @@
 	$effect(() => {
 		// Only run in the browser
 		if (typeof window !== 'undefined') {
-			eventSource = new EventSource(`${API_URL}/api/livestream/${taskId}/events`);
+			eventSource = new EventSource(`${API_URL}/api/livestream/${taskId}/events`, {
+				withCredentials: true
+			});
 
 			eventSource.onopen = () => {
 				isConnected = true;
@@ -306,7 +306,7 @@
 	// ─── Fetch initial state from server (NVR-style persistence) ───
 	async function fetchStreamStatus() {
 		try {
-			const res = await fetch(`${API_URL}/api/livestream/${taskId}/status`);
+			const res = await apiFetch(`/api/livestream/${taskId}/status`);
 			if (res.ok) {
 				const data = await res.json();
 				if (data.started_at) {
@@ -331,7 +331,7 @@
 
 	async function fetchFpsNow() {
 		try {
-			const res = await fetch(`${API_URL}/api/system/cameras`);
+			const res = await apiFetch('/api/system/cameras');
 			if (res.ok) {
 				const data = await res.json();
 				if (data.cameras) {
@@ -348,9 +348,7 @@
 
 	async function fetchRecentEvents() {
 		try {
-			const res = await fetch(
-				`${API_URL}/api/livestream/${taskId}/recent-events?limit=100`
-			);
+			const res = await apiFetch(`/api/livestream/${taskId}/recent-events?limit=100`);
 			if (res.ok) {
 				const data = await res.json();
 				if (data.events && data.events.length > 0) {
@@ -370,7 +368,7 @@
 		fetchCameraInfo();
 
 		// Fetch storage once on mount
-		fetch(`${API_URL}/api/system/storage`)
+		apiFetch('/api/system/storage')
 			.then((res) => res.json())
 			.then((data) => {
 				if (data.total) {
@@ -672,7 +670,13 @@
 		</div>
 
 		<!-- ─── Right Sidebar: Activity Feed (NVR-style) ─── -->
-		<ActivityFeed bind:this={activityFeed} {eventTypeConfig} {isConnected} bind:hasActiveAlert cameraId={taskId} />
+		<ActivityFeed
+			bind:this={activityFeed}
+			{eventTypeConfig}
+			{isConnected}
+			bind:hasActiveAlert
+			cameraId={taskId}
+		/>
 	</div>
 
 	<!-- ─── System Health Footer ─── -->

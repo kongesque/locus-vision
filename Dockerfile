@@ -2,7 +2,7 @@
 FROM node:22-slim AS frontend-build
 
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -43,8 +43,8 @@ COPY backend/ backend/
 COPY --from=frontend-build /app/build build/
 COPY --from=frontend-build /app/package.json ./
 
-# Backup coco_classes.json so entrypoint can seed it into the volume
-RUN cp backend/data/coco_classes.json backend/coco_classes.seed.json 2>/dev/null || true
+# Backup COCO labels so the entrypoint can seed the persistent data volume.
+RUN cp backend/coco_classes.json backend/coco_classes.seed.json
 
 # Entrypoint seeds data dir on first run
 COPY docker-entrypoint.sh /usr/local/bin/
@@ -60,7 +60,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
 CMD ["bash", "-c", "\
     cd /app/backend && uvicorn main:app --host 0.0.0.0 --port 8000 & \
     PID_BACKEND=$! && \
-    cd /app && PORT=3000 ORIGIN=http://localhost:3000 node build & \
+    cd /app && PORT=3000 ORIGIN=${ORIGIN:-http://localhost:3000} node build & \
     PID_FRONTEND=$! && \
     trap 'kill $PID_BACKEND $PID_FRONTEND 2>/dev/null' EXIT && \
     wait -n && exit 1"]

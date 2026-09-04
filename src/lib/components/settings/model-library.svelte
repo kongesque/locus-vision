@@ -16,7 +16,7 @@
 		FileUp
 	} from '@lucide/svelte';
 
-	const API_URL = 'http://localhost:8000';
+	import { apiFetch } from '$lib/api';
 
 	interface ModelEntry {
 		name: string;
@@ -104,7 +104,7 @@
 			if (backends.includes('onnx_int8')) precision = 'int8';
 			else if (backends.includes('onnx_fp16')) precision = 'fp16';
 
-			const res = await fetch(`${API_URL}/api/models/download`, {
+			const res = await apiFetch('/api/models/download', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ model_name: modelName, precision })
@@ -127,7 +127,7 @@
 	function pollDownload(modelName: string, jobId: string) {
 		const interval = setInterval(async () => {
 			try {
-				const res = await fetch(`${API_URL}/api/models/download/status`);
+				const res = await apiFetch('/api/models/download/status');
 				if (!res.ok) return;
 
 				const statuses = await res.json();
@@ -156,7 +156,7 @@
 		removingModels.add(modelName);
 
 		try {
-			const res = await fetch(`${API_URL}/api/models/${modelName}`, {
+			const res = await apiFetch(`/api/models/${modelName}`, {
 				method: 'DELETE'
 			});
 
@@ -197,7 +197,6 @@
 	}
 
 	async function uploadFile(file: File) {
-
 		const validExtensions = ['.onnx', '.tflite', '.pt'];
 		if (!validExtensions.some((ext) => file.name.endsWith(ext))) {
 			uploadState = 'error';
@@ -216,7 +215,7 @@
 			const formData = new FormData();
 			formData.append('file', file);
 
-			const res = await fetch(`${API_URL}/api/models/upload`, {
+			const res = await apiFetch('/api/models/upload', {
 				method: 'POST',
 				body: formData
 			});
@@ -245,7 +244,7 @@
 
 	async function refreshModels() {
 		try {
-			const res = await fetch(`${API_URL}/api/models/registry`);
+			const res = await apiFetch('/api/models/registry');
 			if (res.ok) {
 				const data = await res.json();
 				models = data.models ?? [];
@@ -325,19 +324,17 @@
 				<AlertCircle class="size-8 text-destructive" />
 				<p class="text-sm text-destructive">{uploadError}</p>
 				<p class="text-xs text-muted-foreground">Click or drop to try again</p>
+			{:else if isDragging}
+				<FileUp class="size-8 text-primary" />
+				<p class="text-sm font-medium text-primary">Drop model here</p>
 			{:else}
-				{#if isDragging}
-					<FileUp class="size-8 text-primary" />
-					<p class="text-sm font-medium text-primary">Drop model here</p>
-				{:else}
-					<Upload class="size-8 text-muted-foreground" />
-					<div>
-						<p class="text-sm font-medium">Drop model file here</p>
-						<p class="mt-1 text-xs text-muted-foreground">
-							YOLO models — ONNX, TFLite, or PyTorch (.pt auto-converts to ONNX)
-						</p>
-					</div>
-				{/if}
+				<Upload class="size-8 text-muted-foreground" />
+				<div>
+					<p class="text-sm font-medium">Drop model file here</p>
+					<p class="mt-1 text-xs text-muted-foreground">
+						YOLO models — ONNX, TFLite, or PyTorch (.pt auto-converts to ONNX)
+					</p>
+				</div>
 			{/if}
 		</label>
 	</Card.Content>
@@ -395,7 +392,7 @@
 						<Button
 							variant="ghost"
 							size="sm"
-							class="text-destructive hover:text-destructive cursor-pointer"
+							class="cursor-pointer text-destructive hover:text-destructive"
 							disabled={removingModels.has(model.name)}
 							onclick={() => handleRemove(model.name)}
 						>
@@ -417,9 +414,7 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-lg">Available</Card.Title>
-			<Card.Description>
-				Models compatible with your hardware — download to use
-			</Card.Description>
+			<Card.Description>Models compatible with your hardware — download to use</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<div class="space-y-3">
@@ -453,9 +448,7 @@
 							{#if downloadingModels.has(model.name)}
 								<div class="flex items-center gap-2 text-sm text-muted-foreground">
 									<Loader2 class="size-4 animate-spin" />
-									<span class="capitalize"
-										>{downloadStatus[model.name] ?? 'starting'}</span
-									>
+									<span class="capitalize">{downloadStatus[model.name] ?? 'starting'}</span>
 								</div>
 							{:else if downloadStatus[model.name] === 'error'}
 								<span class="text-xs text-destructive">Failed</span>

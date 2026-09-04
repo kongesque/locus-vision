@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { API_URL } from '$lib/api';
+	import { apiFetch } from '$lib/api';
 	import PageTitle from '$lib/components/page-title-2.svelte';
 	import AddCamera from '$lib/components/livestream/add-camera.svelte';
 	import LiveCard from './live-card.svelte';
@@ -24,7 +24,7 @@
 
 	async function fetchCameras() {
 		try {
-			const res = await fetch(`${API_URL}/api/cameras`);
+			const res = await apiFetch('/api/cameras');
 			if (res.ok) {
 				const allCameras = await res.json();
 				// Only show cameras with 'active' status (configured and ready to use)

@@ -39,7 +39,7 @@
 	// Reset error state when thumbnail changes
 	$effect(() => {
 		// Access thumbnail to track dependency
-		thumbnail;
+		void thumbnail;
 		imgFailed = false;
 	});
 

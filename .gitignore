@@ -50,6 +50,7 @@ bundle-stats.html
 
 # Backend Data
 /backend/data/
+/data/
 
 /locus-report
 static/data/test-video.mp4

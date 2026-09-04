@@ -16,6 +16,7 @@ router = APIRouter(
 
 CACHE_DIR = "data/videos"
 os.makedirs(CACHE_DIR, exist_ok=True)
+MAX_VIDEO_UPLOAD_BYTES = int(os.getenv("LOCUS_MAX_VIDEO_UPLOAD_BYTES", str(10 * 1024**3)))
 
 
 @router.post("/{task_id}/process")
@@ -40,9 +41,18 @@ async def process_video(
 
     input_path = os.path.join(CACHE_DIR, f"input_{task_id}.mp4")
 
-    with open(input_path, "wb") as buffer:
-        content = await video.read()
-        buffer.write(content)
+    try:
+        total_size = 0
+        with open(input_path, "wb") as buffer:
+            while chunk := await video.read(1024 * 1024):
+                total_size += len(chunk)
+                if total_size > MAX_VIDEO_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Video exceeds the upload size limit")
+                buffer.write(chunk)
+    except Exception:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        raise
 
     db = await get_db()
     try:

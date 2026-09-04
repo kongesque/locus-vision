@@ -18,6 +18,7 @@ import supervision as sv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, "data", "models")
 CLASSES_PATH = os.path.join(BASE_DIR, "data", "coco_classes.json")
+CLASSES_SEED_PATH = os.path.join(BASE_DIR, "coco_classes.json")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 
@@ -29,8 +30,9 @@ def _load_class_names() -> dict[int, str]:
     global _class_names
     if _class_names:
         return _class_names
-    if os.path.exists(CLASSES_PATH):
-        with open(CLASSES_PATH, "r") as f:
+    classes_path = CLASSES_PATH if os.path.exists(CLASSES_PATH) else CLASSES_SEED_PATH
+    if os.path.exists(classes_path):
+        with open(classes_path, "r") as f:
             raw = json.load(f)
             _class_names = {int(k): v for k, v in raw.items()}
     else:
@@ -279,14 +281,18 @@ class OnnxDetector:
 
 def _get_tflite_interpreter_class():
     """
-    Import the TFLite Interpreter class from tflite-runtime.
+    Import the TFLite Interpreter class from LiteRT or legacy tflite-runtime.
     Returns the Interpreter class or None if unavailable.
     """
     try:
-        from tflite_runtime.interpreter import Interpreter
+        from ai_edge_litert.interpreter import Interpreter
         return Interpreter
     except ImportError:
-        return None
+        try:
+            from tflite_runtime.interpreter import Interpreter
+            return Interpreter
+        except ImportError:
+            return None
 
 
 # ── TFLite Detector ─────────────────────────────────────────────
@@ -558,4 +564,3 @@ def list_models() -> list[str]:
                     models.append(f.replace(ext, ""))
                     break
     return sorted(set(models))
-

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle2 from '$lib/components/page-title-2.svelte';
-	import { API_URL } from '$lib/api';
+	import { API_URL, apiFetch } from '$lib/api';
 	import UploadArea from '$lib/components/video-analytics/upload-area.svelte';
 	import SearchInput from '$lib/components/video-analytics/search-input.svelte';
 	import VideoCard from '$lib/components/video-analytics/video-card.svelte';
@@ -23,13 +23,13 @@
 
 	let filteredHistory = $derived(
 		history.filter((item: any) =>
-			((item.name || item.filename) || item.id).toLowerCase().includes(searchQuery.toLowerCase())
+			(item.name || item.filename || item.id).toLowerCase().includes(searchQuery.toLowerCase())
 		)
 	);
 
 	async function refreshHistory() {
 		try {
-			const res = await fetch(`${API_URL}/api/video/history`);
+			const res = await apiFetch('/api/video/history');
 			if (res.ok) {
 				history = await res.json();
 			}
@@ -60,7 +60,7 @@
 		deleteError = '';
 
 		try {
-			const res = await fetch(`${API_URL}/api/video/${taskToDelete.id}`, {
+			const res = await apiFetch(`/api/video/${taskToDelete.id}`, {
 				method: 'DELETE'
 			});
 
@@ -73,7 +73,7 @@
 				const data = await res.json();
 				deleteError = data.detail || 'Failed to delete task';
 			}
-		} catch (e) {
+		} catch {
 			deleteError = 'Network error. Please try again.';
 		} finally {
 			isDeleting = false;
@@ -133,16 +133,24 @@
 				Delete Task
 			</Dialog.Title>
 			<Dialog.Description>
-				Are you sure you want to delete <strong>{(taskToDelete?.name || taskToDelete?.filename) || 'this task'}</strong>? This
-				action cannot be undone.
+				Are you sure you want to delete <strong
+					>{taskToDelete?.name || taskToDelete?.filename || 'this task'}</strong
+				>? This action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if deleteError}
 			<div class="text-sm text-red-600">{deleteError}</div>
 		{/if}
 		<Dialog.Footer class="gap-2 sm:justify-end">
-			<Button variant="outline" onclick={() => (isDeleteDialogOpen = false)} class="cursor-pointer">Cancel</Button>
-			<Button variant="destructive" onclick={deleteTask} disabled={isDeleting} class="cursor-pointer">
+			<Button variant="outline" onclick={() => (isDeleteDialogOpen = false)} class="cursor-pointer"
+				>Cancel</Button
+			>
+			<Button
+				variant="destructive"
+				onclick={deleteTask}
+				disabled={isDeleting}
+				class="cursor-pointer"
+			>
 				{#if isDeleting}
 					<Loader2 class="mr-2 size-4 animate-spin" />
 					Deleting...

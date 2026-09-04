@@ -17,7 +17,8 @@ async def test_v4l2_discovery_mock():
             mock_vc.return_value = mock_cap
             
             discovery = DiscoveryService()
-            results = await discovery.discover_v4l2_devices()
+            with patch('platform.system', return_value='Linux'):
+                results = await discovery.discover_local_devices()
             
             assert len(results) == 1
             assert results[0]['name'] == 'Dummy Camera (usb-123)'
