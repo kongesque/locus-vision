@@ -225,10 +225,17 @@ def create_video_capture(
 
 def get_capture_info(cap) -> dict:
     """Get information about the video capture."""
+    try:
+        backend = cap.getBackendName()
+    except (AttributeError, cv2.error):
+        # OpenCV raises when a local camera cannot be opened (common on
+        # headless systems). Capture diagnostics should still be safe to call.
+        backend = "unavailable"
+
     return {
         "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
         "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
         "fps": cap.get(cv2.CAP_PROP_FPS),
-        "backend": cap.getBackendName(),
+        "backend": backend,
         "is_opened": cap.isOpened(),
     }
